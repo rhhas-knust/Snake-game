@@ -75,6 +75,7 @@
   }
   .board-wrap[data-mode="portal"], .board-wrap[data-mode="zen"] { border-color: #0e7490; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 22px rgb(34 211 238 / .28); }
   .board-wrap[data-mode="maze"] { border-color: #475569; }
+  .board-wrap[data-mode="secret"] { border-color: #a855f7; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 28px rgb(168 85 247 / .55); }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
   .overlay {
@@ -286,6 +287,7 @@
       <li>🥥 and 🥚 are poisonous. They vanish after a few seconds, so you can wait them out.</li>
       <li>Power-ups: 🛡️ blocks one fatal hit, ⏳ slows time, 💎 doubles points, 🧲 pulls fruit toward you, ✂️ trims your tail.</li>
       <li>Grab the rare 🌟 golden star before it disappears for a big bonus.</li>
+      <li>Rumour has it that experienced snakes sometimes spot something swirling on the board… 👀</li>
     </ul>
   </details>
 </main>
@@ -331,6 +333,18 @@ const FRUITS = [
   { id: 'mango',  emoji: '🥭', name: 'Mango',  score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
 ];
 const GOLDEN = { id: 'golden', emoji: '🌟', name: 'Golden Star', score: 75, energy: 40, life: 6000, glow: '#fde047' };
+// Secret level: a hidden portal can open after level 4 and leads to a timed candy stage.
+const PORTAL = { id: 'portal', emoji: '🌀', name: 'Secret Portal', life: 10000, glow: '#a855f7' };
+const SECRET_MS = 20000;
+const SECRET_CANDY_COUNT = 12;
+const CANDIES = [
+  { id: 'candy',    emoji: '🍬', name: 'Candy',    score: 30,  energy: 0, weight: 30, glow: '#f472b6' },
+  { id: 'lolly',    emoji: '🍭', name: 'Lollipop', score: 40,  energy: 0, weight: 24, glow: '#c084fc' },
+  { id: 'donut',    emoji: '🍩', name: 'Donut',    score: 35,  energy: 0, weight: 24, glow: '#fbbf24' },
+  { id: 'cupcake',  emoji: '🧁', name: 'Cupcake',  score: 50,  energy: 0, weight: 14, glow: '#fb7185' },
+  { id: 'crown',    emoji: '👑', name: 'Crown',    score: 200, energy: 0, weight: 2,  glow: '#fde047' },
+];
+const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
 const HAZARDS = [
   { id: 'coconut', emoji: '🥥', name: 'Coconut',    glow: '#ef4444' },
   { id: 'egg',     emoji: '🥚', name: 'Boiled Egg', glow: '#ef4444' },
@@ -356,6 +370,8 @@ const ACHIEVEMENTS = [
   { id: 's2000',   icon: '👑', name: 'Legend',      desc: 'Score 2000 in one game',      test: g => g.score >= 2000 },
   { id: 'expert',  icon: '💀', name: 'Daredevil',   desc: 'Score 300 on Expert',         test: g => g.diff === 'expert' && g.score >= 300 },
   { id: 'maze',    icon: '🪨', name: 'Rock Solid',  desc: 'Reach level 6 in Maze mode',  test: g => g.mode === 'maze' && g.level >= 6 },
+  { id: 'secret',  icon: '🌌', name: 'Explorer',    desc: 'Find the secret level',       test: g => g.secrets >= 1, hidden: true },
+  { id: 'sugar',   icon: '🍭', name: 'Sugar Rush',  desc: 'Score 500 in one secret level', test: g => g.secretBest >= 500, hidden: true },
 ];
 
 const U = { x: 0, y: -1 }, D = { x: 0, y: 1 }, L = { x: -1, y: 0 }, R = { x: 1, y: 0 };
@@ -371,7 +387,7 @@ function loadSave() {
   const s = {
     bests: raw.bests || {},
     settings: { mode: 'classic', diff: 'medium', skin: 'emerald', sound: true, ...(raw.settings || {}) },
-    stats: { games: 0, fruits: 0, bestLength: 0, playMs: 0, ...(raw.stats || {}) },
+    stats: { games: 0, fruits: 0, bestLength: 0, playMs: 0, secrets: 0, ...(raw.stats || {}) },
     achievements: raw.achievements || {},
   };
   if (!MODES[s.settings.mode]) s.settings.mode = 'classic';
@@ -428,6 +444,8 @@ const sfx = {
   count(go)  { tone(go ? 880 : 440, go ? .2 : .1, 'sine', .4); },
   achieve()  { [660, 880, 1320].forEach((f, i) => tone(f, .12, 'sine', .3, .15 + i * .07)); },
   click()    { tone(700, .04, 'sine', .15); },
+  secret()   { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .18, 'triangle', .3, i * .07)); tone(110, .9, 'sine', .3, 0, 440); },
+  portal()   { tone(330, .6, 'sine', .25, 0, 990); },
   poof()     { tone(220, .12, 'triangle', .15, 0, 110); },
 };
 const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
@@ -471,6 +489,7 @@ let score, best, energy, level, fruitsEaten, combo, lastEatAt, maxCombo;
 let gameTime, acc, tickCount, countdownMs, effects, shield, ghostUntil;
 let nextHazardAt, nextPowerAt, nextGoldenAt, powerCount, goldenCount, shieldSaved;
 let deathReason, isWin, newBest, gameId = 0;
+let secret = null, portalSpawned = false, secretsFound = 0, secretBest = 0, konamiBoost = false, konamiPos = 0;
 let shake = 0, flash = 0, banner = null;
 const particles = [], floaters = [];
 
@@ -491,6 +510,7 @@ function setupGame() {
   powerCount = 0; goldenCount = 0;
   deathReason = ''; isWin = false; newBest = false;
   particles.length = 0; floaters.length = 0; shake = 0; flash = 0; banner = null;
+  secret = null; portalSpawned = false; secretsFound = 0; secretBest = 0;
   best = save.bests[bestKey()] || 0;
   spawnFruit();
   scheduleHazard();
@@ -594,7 +614,7 @@ function tick() {
 
   let nx = snake[0].x + dir.x, ny = snake[0].y + dir.y;
   if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
-    if (mode.wrap || isGhost() || useShield()) { nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS; }
+    if (mode.wrap || secret || isGhost() || useShield()) { nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS; }
     else return die('You hit the wall');
   }
 
@@ -645,8 +665,71 @@ function consume(item) {
     }
   } else if (item.kind === 'power') {
     applyPower(t, cx, cy);
+  } else if (item.kind === 'candy') {
+    combo = (gameTime - lastEatAt <= COMBO_WINDOW) ? Math.min(combo + 1, MAX_COMBO) : 1;
+    lastEatAt = gameTime;
+    maxCombo = Math.max(maxCombo, combo);
+    const pts = t.score * combo * (effects.double > gameTime ? 2 : 1);
+    score += pts;
+    if (secret) secret.points += pts;
+    burst(cx, cy, t.glow, t.id === 'crown' ? 30 : 12, 4);
+    floater(cx, cy - .2, '+' + pts, t.id === 'crown' ? '#fde047' : '#f5d0fe', .5);
+    if (t.id === 'crown') sfx.golden(); else sfx.eat(combo);
+    if (secret) spawnCandy();
+  } else if (item.kind === 'portal') {
+    enterSecret();
   }
   checkAchievements();
+}
+
+// ---------- Secret level ----------
+function spawnPortal() {
+  const c = randomFree(4);
+  if (!c) return;
+  portalSpawned = true;
+  konamiBoost = false;
+  items.push({ ...c, kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life });
+  floater(c.x + .5, c.y - .2, '???', PORTAL.glow, .5);
+  sfx.portal();
+}
+function spawnCandy() {
+  const c = randomFree(2);
+  if (c) items.push({ ...c, kind: 'candy', type: pickWeighted(CANDIES), born: gameTime });
+}
+function enterSecret() {
+  secret = { until: gameTime + SECRET_MS, rocks: obstacleList, points: 0 };
+  secretsFound++;
+  save.stats.secrets = (save.stats.secrets || 0) + 1;
+  obstacles = new Set(); obstacleList = [];
+  items = [];
+  energy = 100;
+  for (let i = 0; i < SECRET_CANDY_COUNT; i++) spawnCandy();
+  const h = snake[0];
+  burst(h.x + .5, h.y + .5, PORTAL.glow, 40, 8);
+  shake = Math.max(shake, 8);
+  banner = { text: 'SECRET LEVEL', sub: `Candy rush! ${SECRET_MS / 1000} seconds`, t: 0, dur: 1800 };
+  sfx.secret(); vibrate(80);
+  wrapEl.dataset.mode = 'secret';
+}
+function exitSecret() {
+  const s = secret;
+  secret = null;
+  secretBest = Math.max(secretBest, s.points);
+  items = [];
+  // Bring the rocks back, except any that would land on the snake.
+  const snakeSet = new Set(snake.map(p => cellKey(p.x, p.y)));
+  obstacles = new Set(); obstacleList = [];
+  for (const r of s.rocks) if (!snakeSet.has(cellKey(r.x, r.y))) addRock(r.x, r.y, gameTime);
+  ghostUntil = gameTime + 2000;   // grace period to find your bearings
+  spawnFruit();
+  scheduleHazard();
+  nextPowerAt = gameTime + rand(6000, 12000);
+  nextGoldenAt = gameTime + rand(15000, 25000);
+  banner = { text: 'WELCOME BACK', sub: `+${s.points} secret points`, t: 0, dur: 1800 };
+  sfx.portal();
+  wrapEl.dataset.mode = modeId;
+  checkAchievements();
+  persist();
 }
 
 function applyPower(p, cx, cy) {
@@ -682,7 +765,7 @@ function magnetPull() {
   const h = snake[0];
   const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
   for (const it of items) {
-    if (it.kind !== 'fruit' && it.kind !== 'golden') continue;
+    if (it.kind !== 'fruit' && it.kind !== 'golden' && it.kind !== 'candy') continue;
     const dx = h.x - it.x, dy = h.y - it.y;
     if (Math.abs(dx) + Math.abs(dy) <= 1) continue;
     const moves = Math.abs(dx) >= Math.abs(dy)
@@ -711,6 +794,9 @@ function levelUp() {
     sub = 'New rocks appeared!';
   }
   banner = { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
+  // The portal opens at most once per game: 40% chance from level 4, guaranteed at level 6.
+  const portalLevel = konamiBoost ? 2 : 4;
+  if (!portalSpawned && level >= portalLevel && (konamiBoost || level >= 6 || Math.random() < .4)) spawnPortal();
   checkAchievements();
 }
 
@@ -719,6 +805,7 @@ function die(reason, win = false) {
   acc = 0; queue = [];
   prevSnake = snake.map(s => ({ ...s }));
   deathReason = reason; isWin = win;
+  if (secret) secretBest = Math.max(secretBest, secret.points);
   const h = snake[0];
   if (win) {
     sfx.level();
@@ -783,6 +870,11 @@ function update(dt) {
   }
   if (state !== 'playing') return;
 
+  if (secret) {
+    if (gameTime >= secret.until) exitSecret();
+    if (combo > 0 && gameTime - lastEatAt > COMBO_WINDOW) combo = 0;
+    return;   // no energy drain, poison or power-ups inside the secret level
+  }
   if (mode.energy) {
     energy -= diff.drain * (1 + 0.05 * (level - 1)) * dt / 1000;
     if (energy <= 0) { energy = 0; return die('You ran out of energy'); }
@@ -819,7 +911,8 @@ function floater(x, y, text, color, size = .45) {
 // ---------- Achievements ----------
 function checkAchievements() {
   const g = { fruits: fruitsEaten, maxCombo, length: snake.length, level, golden: goldenCount,
-    shieldSaved, score, diff: diffId, mode: modeId };
+    shieldSaved, score, diff: diffId, mode: modeId, secrets: secretsFound,
+    secretBest: Math.max(secretBest, secret ? secret.points : 0) };
   for (const a of ACHIEVEMENTS) {
     if (save.achievements[a.id] || !a.test(g)) continue;
     save.achievements[a.id] = Date.now();
@@ -898,7 +991,7 @@ function render(now) {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#070d1f'; ctx.fillRect(0, 0, W, W);
   if (shake > 0.2) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
-  ctx.drawImage(bg, 0, 0, W, W);
+  if (secret) drawStarfield(now); else ctx.drawImage(bg, 0, 0, W, W);
 
   drawRocks();
   drawItems(now);
@@ -913,6 +1006,23 @@ function render(now) {
   }
   drawBanner();
   if (state === 'countdown') drawCountdown();
+}
+
+const STARS = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: rand(.4, 1.6), p: rand(0, 6.28), s: rand(.6, 2) }));
+function drawStarfield(now) {
+  const g = ctx.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W * .75);
+  g.addColorStop(0, '#2e1065'); g.addColorStop(1, '#0b0620');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, W);
+  for (const s of STARS) {
+    ctx.globalAlpha = .35 + .65 * Math.abs(Math.sin(now / 700 * s.s + s.p));
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(((s.x + now / 90000 * s.s) % 1) * W, s.y * W, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Countdown ring around the board edge.
+  const left = clamp((secret.until - gameTime) / SECRET_MS, 0, 1);
+  ctx.fillStyle = left < .25 && Math.floor(now / 200) % 2 ? '#f43f5e' : '#c084fc';
+  ctx.fillRect(0, 0, W * left, Math.max(3, CELL * .12));
 }
 
 function drawRocks() {
@@ -956,6 +1066,13 @@ function drawItems(now) {
       ctx.restore();
     }
     const size = CELL * .95 * sc;
+    if (it.kind === 'portal') {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(-now / 250);
+      const ps = size * (1.1 + .1 * Math.sin(now / 150));
+      ctx.drawImage(emojiSprite(it.type.emoji), -ps / 2, -ps / 2, ps, ps);
+      ctx.restore();
+      continue;
+    }
     ctx.drawImage(emojiSprite(it.type.emoji), cx - size / 2, cy - size / 2 + bob, size, size);
   }
 }
@@ -1076,6 +1193,8 @@ function drawBanner() {
   ctx.translate(W / 2, W * .38); ctx.scale(s, s);
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   ctx.font = `900 ${Math.round(W * .11)}px system-ui, sans-serif`;
+  const fit = Math.min(1, W * .88 / ctx.measureText(banner.text).width);
+  ctx.font = `900 ${Math.round(W * .11 * fit)}px system-ui, sans-serif`;
   ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(2,6,23,.8)';
   ctx.strokeText(banner.text, 0, 0);
   const g = ctx.createLinearGradient(-W * .3, 0, W * .3, 0);
@@ -1151,6 +1270,7 @@ function updateHud() {
   setStyle('comboW', v => el.comboFill.style.width = v, Math.round(comboLeft * 100) + '%');
 
   const chips = [];
+  if (secret) chips.push([`🌌 Secret ${Math.ceil((secret.until - gameTime) / 1000)}s`, '#c084fc']);
   if (shield) chips.push([`${POWERS.shield.emoji} Shield`, POWERS.shield.color]);
   for (const k of ['slow', 'double', 'magnet']) {
     const left = effects[k] - gameTime;
@@ -1226,8 +1346,10 @@ function buildMenu() {
   hudCache.best = null;
 }
 function buildAchievements() {
-  $('achList').innerHTML = ACHIEVEMENTS.map(a =>
-    `<div class="ach${save.achievements[a.id] ? '' : ' locked'}"><span class="ic">${a.icon}</span><span><b>${a.name}</b><small>${a.desc}</small></span></div>`).join('') +
+  $('achList').innerHTML = ACHIEVEMENTS.map(a => {
+    const got = save.achievements[a.id], mystery = a.hidden && !got;
+    return `<div class="ach${got ? '' : ' locked'}"><span class="ic">${mystery ? '❔' : a.icon}</span><span><b>${mystery ? '???' : a.name}</b><small>${mystery ? 'Hidden achievement' : a.desc}</small></span></div>`;
+  }).join('') +
     `<div class="hint">${save.stats.games} games played · ${save.stats.fruits} fruits eaten · ${fmtTime(save.stats.playMs)} total</div>`;
 }
 $('menu').addEventListener('click', e => {
@@ -1281,6 +1403,16 @@ document.addEventListener('keydown', e => {
   const k = e.key.toLowerCase();
   // Let a focused button handle its own Enter/Space.
   if ((k === 'enter' || k === ' ') && e.target.closest && e.target.closest('button')) return;
+
+  if (state === 'menu') {
+    konamiPos = k === KONAMI[konamiPos] ? konamiPos + 1 : (k === KONAMI[0] ? 1 : 0);
+    if (konamiPos === KONAMI.length) {
+      konamiPos = 0;
+      konamiBoost = true;
+      toast('🌌 Something stirs... watch for a portal at level 2');
+      sfx.secret();
+    }
+  }
 
   if (KEYMAP[k]) {
     if (state === 'playing' || state === 'countdown') { e.preventDefault(); queueDir(KEYMAP[k]); }
