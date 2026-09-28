@@ -170,6 +170,9 @@
   details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: .8rem; color: var(--muted); }
   summary { cursor: pointer; font-weight: 700; color: var(--text); }
   details ul { margin: 8px 0 2px; padding-left: 18px; line-height: 1.55; }
+  .credit { text-align: center; font-size: .75rem; color: var(--muted); padding-top: 2px; }
+  .credit a { color: #f472b6; font-weight: 800; text-decoration: none; }
+  .credit a:hover { text-decoration: underline; }
   kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: .72rem; color: var(--text); font-family: inherit; }
 
   /* ---------- D-pad (touch devices) ---------- */
@@ -309,6 +312,8 @@
       <li>Rumour has it that experienced snakes sometimes spot something swirling on the board… 👀</li>
     </ul>
   </details>
+
+  <footer class="credit">Made by <a href="https://www.tiktok.com/@roberthasford" target="_blank" rel="noopener">@roberthasford</a> · follow on TikTok for updates</footer>
 </main>
 
 <script>
@@ -440,7 +445,7 @@ function dailyState() {
 // ---------- Sharing ----------
 const GAME_URL = /^https?:/.test(location.protocol) ? location.origin + location.pathname : 'https://rhhas-knust.github.io/Snake-game/';
 const SHARE_URL_LABEL = GAME_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
-const CREATOR_HANDLE = '';   // e.g. '@yourtiktok' to print "Follow @yourtiktok" on share cards
+const CREATOR_HANDLE = '@roberthasford';   // TikTok handle printed on share cards
 
 // ================================================================
 // Audio (tiny WebAudio synth, no files needed)
@@ -1400,7 +1405,7 @@ function prepareShare() {
 
 function shareText() {
   const what = isDaily ? `Snake Pro Daily #${dailyNumber()}` : `Snake Pro (${mode.name} · ${diff.name})`;
-  return `I scored ${score} in ${what} 🐍 Can you beat me? ${GAME_URL}`;
+  return `I scored ${score} in ${what} 🐍 Can you beat me? ${GAME_URL}` + (CREATOR_HANDLE ? ` · by ${CREATOR_HANDLE}` : '');
 }
 
 function buildShareCard() {
@@ -1458,7 +1463,7 @@ function buildShareCard() {
 
   // Stats.
   const stats = [['LEVEL', level], ['LENGTH', snake.length], ['COMBO', 'x' + maxCombo], ['TIME', fmtTime(gameTime)]];
-  const sw = 220, gap = 20, sx0 = (Wc - (sw * 4 + gap * 3)) / 2, sy = 1620;
+  const sw = 220, gap = 20, sx0 = (Wc - (sw * 4 + gap * 3)) / 2, sy = 1600;
   stats.forEach(([label, val], i) => {
     const x = sx0 + i * (sw + gap);
     g.fillStyle = 'rgba(255,255,255,.07)'; rr(g, x, sy, sw, 130, 26); g.fill();
@@ -1475,9 +1480,13 @@ function buildShareCard() {
     g.fillText(text, Wc / 2, y);
   };
   g.fillStyle = '#fde047';
-  fitText(isDaily ? 'Same board for everyone today. Beat me!' : 'Can you beat my score?', 900, 56, 1800);
+  fitText(isDaily ? 'Same board for everyone today. Beat me!' : 'Can you beat my score?', 900, 56, CREATOR_HANDLE ? 1775 : 1800);
   g.fillStyle = '#4ade80';
-  fitText(`▶ ${SHARE_URL_LABEL}` + (CREATOR_HANDLE ? `  ·  ${CREATOR_HANDLE}` : ''), 800, 40, 1868);
+  fitText(`▶ ${SHARE_URL_LABEL}`, 800, 40, CREATOR_HANDLE ? 1840 : 1868);
+  if (CREATOR_HANDLE) {
+    g.fillStyle = '#f472b6';
+    fitText(`Follow ${CREATOR_HANDLE} on TikTok`, 800, 36, 1893);
+  }
   return c;
 }
 
