@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b1120">
+<title>Snake Pro</title>
+<style>
+  :root {
+    --bg: #0b1120; --panel: #131c31; --panel-2: #1b2640; --line: #26324d;
+    --text: #e2e8f0; --muted: #94a3b8; --accent: #22c55e; --accent-2: #4ade80;
+    --danger: #ef4444; --warn: #f59e0b; --info: #38bdf8; --gold: #fde047;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh; min-height: 100dvh;
+    display: flex; justify-content: center; align-items: flex-start;
+    background: radial-gradient(1200px 600px at 50% -10%, #1e293b 0%, var(--bg) 60%) fixed, var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  button { font-family: inherit; }
+  button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
+  .hidden { display: none !important; }
+
+  .app { width: min(100%, 520px); padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* ---------- Header & HUD ---------- */
+  .top { display: flex; align-items: center; justify-content: space-between; }
+  h1 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+  h1 em, .menu-title em { font-style: normal; background: linear-gradient(90deg, #4ade80, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .top-actions { display: flex; gap: 8px; }
+  .icon-btn {
+    width: 40px; height: 40px; border-radius: 12px; cursor: pointer;
+    background: var(--panel); border: 1px solid var(--line); color: var(--text);
+    font-size: 1.05rem; display: grid; place-items: center;
+  }
+  .icon-btn:disabled { opacity: .4; cursor: default; }
+
+  .hud { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .stat { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 6px 4px; text-align: center; }
+  .stat span { display: block; font-size: .62rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+  .stat strong { display: inline-block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+  .pop { animation: pop .28s ease-out; }
+  @keyframes pop { 45% { transform: scale(1.3); color: var(--accent-2); } }
+
+  .meter-label { display: flex; justify-content: space-between; font-size: .78rem; color: var(--muted); font-weight: 700; margin-bottom: 4px; }
+  .meter-label strong { color: var(--text); font-variant-numeric: tabular-nums; }
+  .bar { height: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; overflow: hidden; padding: 1px; }
+  #energyFill { height: 100%; width: 100%; border-radius: 99px; background: linear-gradient(90deg, #16a34a, #4ade80); transition: width .2s linear; }
+  #energyFill.mid { background: linear-gradient(90deg, #d97706, #fbbf24); }
+  #energyFill.low { background: linear-gradient(90deg, #b91c1c, #f87171); animation: blink .5s infinite alternate; }
+  #energyFill.inf { background: linear-gradient(90deg, #6366f1, #22d3ee); }
+  @keyframes blink { to { opacity: .45; } }
+
+  .sub-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-height: 28px; }
+  .combo { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 800; color: var(--muted); }
+  .combo strong { font-size: .95rem; color: var(--gold); min-width: 2.2em; }
+  .combo.off strong { color: var(--muted); }
+  .combo-bar { width: 64px; height: 5px; border-radius: 99px; background: var(--panel); overflow: hidden; }
+  #comboFill { height: 100%; width: 0; background: var(--gold); border-radius: 99px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .chip { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--c, var(--line)); color: var(--text); white-space: nowrap; }
+
+  /* ---------- Board ---------- */
+  .board-wrap {
+    position: relative; margin: 0 auto; aspect-ratio: 1;
+    width: min(100%, calc(100vh - 290px)); width: min(100%, calc(100dvh - 290px)); min-width: 260px;
+    border-radius: 18px; overflow: hidden; background: #070d1f;
+    border: 2px solid var(--line);
+    box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6);
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .board-wrap[data-mode="portal"], .board-wrap[data-mode="zen"] { border-color: #0e7490; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 22px rgb(34 211 238 / .28); }
+  .board-wrap[data-mode="maze"] { border-color: #475569; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .overlay {
+    position: absolute; inset: 0; display: flex; overflow-y: auto; padding: 14px;
+    background: rgb(2 6 23 / .74); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
+    animation: fade .2s ease-out;
+  }
+  .ov-inner { margin: auto; width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; }
+  @keyframes fade { from { opacity: 0; } }
+  .menu-title { font-size: clamp(1.4rem, 6vw, 1.9rem); font-weight: 800; letter-spacing: -.02em; }
+  .label { align-self: flex-start; font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; color: var(--muted); margin-bottom: -4px; }
+
+  .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; width: 100%; }
+  .mode {
+    display: flex; gap: 8px; align-items: center; text-align: left; cursor: pointer;
+    background: var(--panel); border: 1.5px solid var(--line); border-radius: 12px; padding: 7px 8px; color: var(--text);
+  }
+  .mode .ic { font-size: 1.25rem; }
+  .mode b { display: block; font-size: .84rem; }
+  .mode small { display: block; color: var(--muted); font-size: .66rem; line-height: 1.2; }
+  .mode.sel { border-color: var(--accent); background: rgb(34 197 94 / .12); }
+
+  .seg { display: flex; width: 100%; padding: 3px; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+  .seg button { flex: 1; background: none; border: 0; color: var(--muted); padding: 7px 0; border-radius: 9px; font-weight: 700; font-size: .8rem; cursor: pointer; }
+  .seg button.sel { background: var(--accent); color: #052e16; }
+
+  .skins { display: flex; gap: 10px; justify-content: center; }
+  .skin { width: 26px; height: 26px; border-radius: 50%; cursor: pointer; background: var(--sw); border: 2px solid rgb(255 255 255 / .15); padding: 0; }
+  .skin.sel { border-color: #fff; box-shadow: 0 0 0 3px rgb(34 197 94 / .6); }
+
+  .primary {
+    background: linear-gradient(180deg, #4ade80, #22c55e); color: #052e16; border: 0; border-radius: 14px;
+    padding: 11px 30px; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 8px 20px -6px rgb(34 197 94 / .6);
+  }
+  .primary:active, .ghost-btn:active { transform: translateY(1px); }
+  .ghost-btn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 10px 18px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+  .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .menu-foot { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: .72rem; color: var(--muted); font-weight: 600; }
+  .link-btn { background: none; border: 0; color: var(--gold); font-weight: 800; font-size: .75rem; cursor: pointer; padding: 4px; }
+  .hint { font-size: .7rem; color: var(--muted); }
+
+  .ov-title { font-size: 1.7rem; font-weight: 800; letter-spacing: .02em; }
+  .ov-title.bad { color: #f87171; }
+  .ov-title.win { color: var(--gold); }
+  .over-reason { color: var(--muted); font-weight: 600; font-size: .88rem; margin-top: -6px; }
+  .final-score { font-size: 2.6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .final-score small { display: block; font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+  .badge { background: linear-gradient(90deg, #f59e0b, #fde047); color: #422006; font-weight: 800; font-size: .78rem; padding: 4px 12px; border-radius: 99px; animation: pop .5s ease-out; }
+  .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
+  .stats-grid div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; }
+  .stats-grid b { display: block; font-size: 1rem; font-variant-numeric: tabular-nums; }
+  .stats-grid span { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+
+  .ach-list { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  .ach { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+  .ach .ic { font-size: 1.3rem; }
+  .ach b { display: block; font-size: .82rem; }
+  .ach small { color: var(--muted); font-size: .7rem; }
+  .ach.locked { opacity: .45; }
+  .ach.locked .ic { filter: grayscale(1); }
+
+  .toast {
+    position: absolute; left: 50%; top: 10px; transform: translate(-50%, -140%);
+    background: rgb(15 23 42 / .95); border: 1px solid var(--gold); color: var(--text);
+    padding: 7px 14px; border-radius: 99px; font-size: .8rem; font-weight: 700; white-space: nowrap;
+    transition: transform .3s cubic-bezier(.2, .9, .3, 1.3); pointer-events: none; z-index: 5;
+  }
+  .toast.show { transform: translate(-50%, 0); }
+
+  /* ---------- Legend / help ---------- */
+  .legend { display: flex; flex-direction: column; gap: 8px; }
+  .lg-group { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: center; }
+  .lg-group h3 { margin: 0; font-size: .62rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); width: 100%; text-align: center; }
+  .lg-group span { padding: 3px 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 99px; font-size: .74rem; color: var(--text); }
+  .lg-group span.bad { border-color: rgb(239 68 68 / .5); }
+  .lg-group span.gold { border-color: rgb(253 224 71 / .6); }
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 8px 12px; font-size: .8rem; color: var(--muted); }
+  summary { cursor: pointer; font-weight: 700; color: var(--text); }
+  details ul { margin: 8px 0 2px; padding-left: 18px; line-height: 1.55; }
+  kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: .72rem; color: var(--text); font-family: inherit; }
+
+  /* ---------- D-pad (touch devices) ---------- */
+  .dpad { display: none; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(2, 50px); gap: 8px; justify-content: center; }
+  .dbtn {
+    background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 14px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; touch-action: none;
+  }
+  .dbtn:active, .dbtn.on { background: var(--panel-2); border-color: var(--accent); }
+  .dbtn.up { grid-column: 2; grid-row: 1; }
+  .dbtn.left { grid-column: 1; grid-row: 2; }
+  .dbtn.down { grid-column: 2; grid-row: 2; }
+  .dbtn.right { grid-column: 3; grid-row: 2; }
+  .touch-only { display: none; }
+  @media (pointer: coarse) {
+    .dpad { display: grid; }
+    .touch-only { display: inline; }
+    .desk-only { display: none; }
+    .board-wrap { width: min(100%, calc(100vh - 400px)); width: min(100%, calc(100dvh - 400px)); }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <h1>🐍 Snake <em>Pro</em></h1>
+    <div class="top-actions">
+      <button class="icon-btn" id="soundBtn" aria-label="Toggle sound" title="Sound (M)">🔊</button>
+      <button class="icon-btn" id="pauseBtn" aria-label="Pause" title="Pause (P)">⏸</button>
+    </div>
+  </header>
+
+  <section class="hud" aria-live="polite">
+    <div class="stat"><span>Score</span><strong id="score">0</strong></div>
+    <div class="stat"><span>Level</span><strong id="level">1</strong></div>
+    <div class="stat"><span>Length</span><strong id="length">4</strong></div>
+    <div class="stat"><span>Best</span><strong id="best">0</strong></div>
+  </section>
+
+  <section>
+    <div class="meter-label"><span>⚡ Energy</span><strong id="energyText">100%</strong></div>
+    <div class="bar"><div id="energyFill"></div></div>
+    <div class="sub-row">
+      <div class="combo off" id="combo">COMBO <strong id="comboText">—</strong><div class="combo-bar"><div id="comboFill"></div></div></div>
+      <div class="chips" id="chips"></div>
+    </div>
+  </section>
+
+  <div class="board-wrap" id="boardWrap">
+    <canvas id="board" aria-label="Snake game board"></canvas>
+
+    <div class="overlay" id="menu">
+      <div class="ov-inner">
+        <div class="menu-title">🐍 Snake <em>Pro</em></div>
+        <div class="label">Mode</div>
+        <div class="modes" id="modes"></div>
+        <div class="label">Difficulty</div>
+        <div class="seg" id="diffs"></div>
+        <div class="label">Skin</div>
+        <div class="skins" id="skins"></div>
+        <button class="primary" id="playBtn">▶ Play</button>
+        <div class="menu-foot"><span id="menuBest">Best: 0</span><button class="link-btn" id="achBtn">🏆 0/0</button></div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="pauseScreen">
+      <div class="ov-inner">
+        <div class="ov-title">Paused</div>
+        <div class="btn-row">
+          <button class="primary" id="resumeBtn">▶ Resume</button>
+        </div>
+        <div class="btn-row">
+          <button class="ghost-btn" id="restartBtn">↻ Restart</button>
+          <button class="ghost-btn" id="pauseMenuBtn">☰ Menu</button>
+        </div>
+        <div class="hint desk-only"><kbd>P</kbd> / <kbd>Space</kbd> to resume</div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="overScreen">
+      <div class="ov-inner">
+        <div class="ov-title bad" id="overTitle">Game Over</div>
+        <div class="over-reason" id="overReason"></div>
+        <div class="final-score"><span id="finalScore">0</span><small>points</small></div>
+        <div class="badge hidden" id="newBestBadge">🏆 New personal best!</div>
+        <div class="stats-grid">
+          <div><b id="stLevel">1</b><span>Level</span></div>
+          <div><b id="stLength">4</b><span>Length</span></div>
+          <div><b id="stFruits">0</b><span>Fruits</span></div>
+          <div><b id="stCombo">x0</b><span>Max combo</span></div>
+          <div><b id="stTime">0:00</b><span>Time</span></div>
+          <div><b id="stPowers">0</b><span>Power-ups</span></div>
+        </div>
+        <div class="btn-row">
+          <button class="primary" id="againBtn">↻ Play Again</button>
+          <button class="ghost-btn" id="overMenuBtn">☰ Menu</button>
+        </div>
+        <div class="hint desk-only"><kbd>Enter</kbd> replay · <kbd>Esc</kbd> menu</div>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="achScreen">
+      <div class="ov-inner">
+        <div class="ov-title">🏆 Achievements</div>
+        <div class="ach-list" id="achList"></div>
+        <button class="ghost-btn" id="achBack">← Back</button>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <div class="dpad" id="dpad">
+    <button class="dbtn up" data-dir="up" aria-label="Up">▲</button>
+    <button class="dbtn left" data-dir="left" aria-label="Left">◀</button>
+    <button class="dbtn down" data-dir="down" aria-label="Down">▼</button>
+    <button class="dbtn right" data-dir="right" aria-label="Right">▶</button>
+  </div>
+
+  <section class="legend" id="legend"></section>
+
+  <details>
+    <summary>How to play</summary>
+    <ul>
+      <li class="desk-only">Move with <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>. Pause with <kbd>P</kbd>, <kbd>Space</kbd> or <kbd>Esc</kbd>. <kbd>M</kbd> mutes.</li>
+      <li class="touch-only">Swipe anywhere on the board, or use the arrow pad.</li>
+      <li>Fruit gives points and energy. Energy drains over time, so keep eating.</li>
+      <li>Eat fruit quickly one after another to build a <b>combo</b> (up to x8 points).</li>
+      <li>Every 5 fruits you level up and the snake gets faster.</li>
+      <li>🥥 and 🥚 are poisonous. They vanish after a few seconds, so you can wait them out.</li>
+      <li>Power-ups: 🛡️ blocks one fatal hit, ⏳ slows time, 💎 doubles points, 🧲 pulls fruit toward you, ✂️ trims your tail.</li>
+      <li>Grab the rare 🌟 golden star before it disappears for a big bonus.</li>
+    </ul>
+  </details>
+</main>
+
+<script>
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+// ================================================================
+// Data
+// ================================================================
+const COLS = 20, ROWS = 20;
+const FRUITS_PER_LEVEL = 5;
+const COMBO_WINDOW = 3500;   // ms between fruits to keep a combo alive
+const MAX_COMBO = 8;
+const COUNT_STEP = 650;      // ms per countdown number
+
+const MODES = {
+  classic: { name: 'Classic', icon: '🧱', desc: 'Walls are deadly',     wrap: false, maze: false, energy: true,  hazards: true },
+  portal:  { name: 'Portal',  icon: '🌀', desc: 'Edges wrap around',    wrap: true,  maze: false, energy: true,  hazards: true },
+  maze:    { name: 'Maze',    icon: '🪨', desc: 'Rocks grow each level', wrap: false, maze: true,  energy: true,  hazards: true },
+  zen:     { name: 'Zen',     icon: '🧘', desc: 'No energy, no poison', wrap: true,  maze: false, energy: false, hazards: false },
+};
+const DIFFS = {
+  easy:   { name: 'Easy',   step: 210, min: 120, drain: 2.4 },
+  medium: { name: 'Medium', step: 160, min: 90,  drain: 3.2 },
+  hard:   { name: 'Hard',   step: 115, min: 65,  drain: 4.0 },
+  expert: { name: 'Expert', step: 82,  min: 50,  drain: 4.8 },
+};
+const SKINS = {
+  emerald: { name: 'Emerald', head: '#86efac', body: '#22c55e', tail: '#166534' },
+  ocean:   { name: 'Ocean',   head: '#7dd3fc', body: '#0ea5e9', tail: '#1e3a8a' },
+  neon:    { name: 'Neon',    head: '#f5d0fe', body: '#d946ef', tail: '#6b21a8' },
+  sunset:  { name: 'Sunset',  head: '#fde68a', body: '#f97316', tail: '#991b1b' },
+  rainbow: { name: 'Rainbow', head: '#ffffff', body: '#ff0000', tail: '#0000ff', rainbow: true },
+};
+const FRUITS = [
+  { id: 'apple',  emoji: '🍎', name: 'Apple',  score: 10, energy: 15, weight: 30, glow: '#ef4444' },
+  { id: 'banana', emoji: '🍌', name: 'Banana', score: 15, energy: 20, weight: 22, glow: '#facc15' },
+  { id: 'orange', emoji: '🍊', name: 'Orange', score: 8,  energy: 10, weight: 30, glow: '#fb923c' },
+  { id: 'grapes', emoji: '🍇', name: 'Grapes', score: 20, energy: 25, weight: 12, glow: '#a855f7' },
+  { id: 'mango',  emoji: '🥭', name: 'Mango',  score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
+];
+const GOLDEN = { id: 'golden', emoji: '🌟', name: 'Golden Star', score: 75, energy: 40, life: 6000, glow: '#fde047' };
+const HAZARDS = [
+  { id: 'coconut', emoji: '🥥', name: 'Coconut',    glow: '#ef4444' },
+  { id: 'egg',     emoji: '🥚', name: 'Boiled Egg', glow: '#ef4444' },
+];
+const POWERS = {
+  shield: { id: 'shield', emoji: '🛡️', name: 'Shield',   color: '#38bdf8', desc: 'Survive one fatal hit' },
+  slow:   { id: 'slow',   emoji: '⏳', name: 'Slow-mo',  color: '#a78bfa', desc: 'Slows the game down', dur: 7000 },
+  double: { id: 'double', emoji: '💎', name: 'x2 Points', color: '#22d3ee', desc: 'Double points', dur: 10000 },
+  magnet: { id: 'magnet', emoji: '🧲', name: 'Magnet',   color: '#f472b6', desc: 'Pulls fruit toward you', dur: 9000 },
+  shrink: { id: 'shrink', emoji: '✂️', name: 'Shrink',   color: '#fbbf24', desc: 'Trims your tail' },
+};
+const ACHIEVEMENTS = [
+  { id: 'first',   icon: '🍎', name: 'First Bite',  desc: 'Eat your first fruit',        test: g => g.fruits >= 1 },
+  { id: 'combo5',  icon: '🔥', name: 'On Fire',     desc: 'Reach a x5 combo',            test: g => g.maxCombo >= 5 },
+  { id: 'combo8',  icon: '☄️', name: 'Unstoppable', desc: 'Reach the max x8 combo',      test: g => g.maxCombo >= 8 },
+  { id: 'len25',   icon: '📏', name: 'Long Boi',    desc: 'Grow to length 25',           test: g => g.length >= 25 },
+  { id: 'len50',   icon: '🐉', name: 'Dragon',      desc: 'Grow to length 50',           test: g => g.length >= 50 },
+  { id: 'lvl5',    icon: '🚀', name: 'Speedster',   desc: 'Reach level 5',               test: g => g.level >= 5 },
+  { id: 'lvl10',   icon: '🏆', name: 'Master',      desc: 'Reach level 10',              test: g => g.level >= 10 },
+  { id: 'golden',  icon: '🌟', name: 'Gold Digger', desc: 'Eat a golden star',           test: g => g.golden >= 1 },
+  { id: 'shield',  icon: '🛡️', name: 'Close Call',  desc: 'Get saved by a shield',       test: g => g.shieldSaved },
+  { id: 's500',    icon: '💯', name: 'High Roller', desc: 'Score 500 in one game',       test: g => g.score >= 500 },
+  { id: 's2000',   icon: '👑', name: 'Legend',      desc: 'Score 2000 in one game',      test: g => g.score >= 2000 },
+  { id: 'expert',  icon: '💀', name: 'Daredevil',   desc: 'Score 300 on Expert',         test: g => g.diff === 'expert' && g.score >= 300 },
+  { id: 'maze',    icon: '🪨', name: 'Rock Solid',  desc: 'Reach level 6 in Maze mode',  test: g => g.mode === 'maze' && g.level >= 6 },
+];
+
+const U = { x: 0, y: -1 }, D = { x: 0, y: 1 }, L = { x: -1, y: 0 }, R = { x: 1, y: 0 };
+const DIRS = { up: U, down: D, left: L, right: R };
+
+// ================================================================
+// Persistence (localStorage can throw in private mode / sandboxes)
+// ================================================================
+const SAVE_KEY = 'snakepro_v2';
+function loadSave() {
+  let raw = {};
+  try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { raw = {}; }
+  const s = {
+    bests: raw.bests || {},
+    settings: { mode: 'classic', diff: 'medium', skin: 'emerald', sound: true, ...(raw.settings || {}) },
+    stats: { games: 0, fruits: 0, bestLength: 0, playMs: 0, ...(raw.stats || {}) },
+    achievements: raw.achievements || {},
+  };
+  if (!MODES[s.settings.mode]) s.settings.mode = 'classic';
+  if (!DIFFS[s.settings.diff]) s.settings.diff = 'medium';
+  if (!SKINS[s.settings.skin]) s.settings.skin = 'emerald';
+  // Carry over the high score from the original version of the game.
+  try {
+    const old = parseInt(localStorage.getItem('snake_high_score'), 10);
+    if (old > (s.bests['classic:medium'] || 0)) s.bests['classic:medium'] = old;
+  } catch {}
+  return s;
+}
+const save = loadSave();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+const bestKey = () => `${save.settings.mode}:${save.settings.diff}`;
+
+// ================================================================
+// Audio (tiny WebAudio synth, no files needed)
+// ================================================================
+const audio = { ctx: null, master: null };
+function ac() {
+  if (!save.settings.sound) return null;
+  if (!audio.ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audio.ctx = new AC();
+    audio.master = audio.ctx.createGain();
+    audio.master.gain.value = 0.22;
+    audio.master.connect(audio.ctx.destination);
+  }
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+  return audio.ctx;
+}
+function tone(freq, dur = 0.1, type = 'sine', vol = 0.5, delay = 0, slide = 0) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime + delay;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(audio.master);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+const sfx = {
+  eat(c)     { const b = 520 * Math.pow(1.07, c - 1); tone(b, .07, 'square', .25); tone(b * 1.5, .09, 'square', .2, .05); },
+  golden()   { [784, 988, 1175, 1568].forEach((f, i) => tone(f, .12, 'triangle', .35, i * .06)); },
+  power()    { [440, 660, 880].forEach((f, i) => tone(f, .1, 'sine', .4, i * .05)); },
+  level()    { [523, 659, 784, 1047].forEach((f, i) => tone(f, .14, 'triangle', .4, i * .08)); },
+  shield()   { tone(300, .25, 'sawtooth', .3, 0, 120); tone(900, .15, 'sine', .3, .05, 1400); },
+  die()      { tone(400, .5, 'sawtooth', .35, 0, 60); tone(200, .6, 'square', .2, .05, 40); },
+  count(go)  { tone(go ? 880 : 440, go ? .2 : .1, 'sine', .4); },
+  achieve()  { [660, 880, 1320].forEach((f, i) => tone(f, .12, 'sine', .3, .15 + i * .07)); },
+  click()    { tone(700, .04, 'sine', .15); },
+  poof()     { tone(220, .12, 'triangle', .15, 0, 110); },
+};
+const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ================================================================
+// Helpers
+// ================================================================
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = n => Math.floor(Math.random() * n);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const cellKey = (x, y) => x + ',' + y;
+const easeOutBack = t => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgba(h, a) { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b},${a})`; }
+function mixHex(a, b, t) {
+  const A = hexRgb(a), B = hexRgb(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
+}
+function pickWeighted(list) {
+  let r = Math.random() * list.reduce((s, f) => s + f.weight, 0);
+  for (const f of list) if ((r -= f.weight) < 0) return f;
+  return list[0];
+}
+function fmtTime(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function rr(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+// ================================================================
+// Game state
+// ================================================================
+let state = 'menu';          // menu | countdown | playing | paused | over
+let resumeState = 'playing';
+let mode, diff, skin, modeId, diffId;
+let snake, prevSnake, dir, queue, items, obstacles, obstacleList;
+let score, best, energy, level, fruitsEaten, combo, lastEatAt, maxCombo;
+let gameTime, acc, tickCount, countdownMs, effects, shield, ghostUntil;
+let nextHazardAt, nextPowerAt, nextGoldenAt, powerCount, goldenCount, shieldSaved;
+let deathReason, isWin, newBest, gameId = 0;
+let shake = 0, flash = 0, banner = null;
+const particles = [], floaters = [];
+
+function setupGame() {
+  modeId = save.settings.mode; diffId = save.settings.diff;
+  mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
+  snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
+  prevSnake = snake.map(s => ({ ...s }));
+  dir = R; queue = [];
+  obstacles = new Set(); obstacleList = [];
+  if (mode.maze) buildMaze();
+  items = [];
+  score = 0; energy = 100; level = 1; fruitsEaten = 0;
+  combo = 0; lastEatAt = -1e9; maxCombo = 0;
+  gameTime = 0; acc = 0; tickCount = 0;
+  effects = { slow: 0, double: 0, magnet: 0 };
+  shield = false; ghostUntil = 0; shieldSaved = false;
+  powerCount = 0; goldenCount = 0;
+  deathReason = ''; isWin = false; newBest = false;
+  particles.length = 0; floaters.length = 0; shake = 0; flash = 0; banner = null;
+  best = save.bests[bestKey()] || 0;
+  spawnFruit();
+  scheduleHazard();
+  nextPowerAt = rand(9000, 15000);
+  nextGoldenAt = rand(15000, 25000);
+  wrapEl.dataset.mode = modeId;
+}
+
+function startGame() {
+  gameId++;
+  setupGame();
+  showScreen(null);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  state = 'countdown';
+  countdownMs = COUNT_STEP * 3;
+  sfx.count(false);
+}
+
+function buildMaze() {
+  const add = (x, y) => addRock(x, y, 0);
+  for (let x = 3; x <= 7; x++) { add(x, 4); add(x, 15); }
+  for (let x = 12; x <= 16; x++) { add(x, 4); add(x, 15); }
+  for (let y = 5; y <= 7; y++) { add(3, y); add(16, y); }
+  for (let y = 12; y <= 14; y++) { add(3, y); add(16, y); }
+}
+function addRock(x, y, born) {
+  const k = cellKey(x, y);
+  if (obstacles.has(k)) return;
+  obstacles.add(k); obstacleList.push({ x, y, born });
+}
+
+function currentStep() {
+  let s = Math.max(diff.min, diff.step * Math.pow(0.94, level - 1));
+  if (effects.slow > gameTime) s *= 1.6;
+  return s;
+}
+
+// ---------- Spawning ----------
+function isFree(x, y, snakeSet) {
+  if (obstacles.has(cellKey(x, y))) return false;
+  if (snakeSet.has(cellKey(x, y))) return false;
+  return !items.some(i => i.x === x && i.y === y);
+}
+function randomFree(avoidHead = 0) {
+  const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
+  const h = snake[0];
+  const cells = [], fallback = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if (!isFree(x, y, snakeSet)) continue;
+    fallback.push({ x, y });
+    if (Math.abs(x - h.x) + Math.abs(y - h.y) >= avoidHead) cells.push({ x, y });
+  }
+  const pool = cells.length ? cells : fallback;
+  return pool.length ? pool[randInt(pool.length)] : null;
+}
+function spawnFruit() {
+  const c = randomFree(2);
+  if (!c) return false;
+  items.push({ ...c, kind: 'fruit', type: pickWeighted(FRUITS), born: gameTime });
+  return true;
+}
+function spawnGolden() {
+  const c = randomFree(4);
+  if (!c) return;
+  items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
+  floater(c.x + .5, c.y - .2, 'Golden!', GOLDEN.glow, .45);
+}
+function spawnHazard() {
+  const max = Math.min(4, 1 + Math.floor(level / 3));
+  if (items.filter(i => i.kind === 'hazard').length >= max) return;
+  const c = randomFree(5);
+  if (!c) return;
+  const life = rand(6000, 9000);
+  items.push({ ...c, kind: 'hazard', type: HAZARDS[randInt(HAZARDS.length)], born: gameTime, expires: gameTime + life, life });
+}
+function scheduleHazard() {
+  nextHazardAt = gameTime + rand(5000, 10000) * Math.max(0.45, 1 - level * 0.05);
+}
+function spawnPower() {
+  if (items.some(i => i.kind === 'power')) return;
+  const pool = [
+    { p: POWERS.shield, weight: shield ? 0 : 3 },
+    { p: POWERS.slow,   weight: 2 },
+    { p: POWERS.double, weight: 3 },
+    { p: POWERS.magnet, weight: 2 },
+    { p: POWERS.shrink, weight: snake.length > 10 ? 2 : 0 },
+  ].filter(o => o.weight > 0);
+  const c = randomFree(4);
+  if (!c) return;
+  const life = 8000;
+  items.push({ ...c, kind: 'power', type: pickWeighted(pool).p, born: gameTime, expires: gameTime + life, life });
+}
+
+// ---------- Core update ----------
+const isGhost = () => gameTime < ghostUntil;
+
+function tick() {
+  tickCount++;
+  prevSnake = snake.map(s => ({ x: s.x, y: s.y }));
+  if (queue.length) dir = queue.shift();
+
+  let nx = snake[0].x + dir.x, ny = snake[0].y + dir.y;
+  if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+    if (mode.wrap || isGhost() || useShield()) { nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS; }
+    else return die('You hit the wall');
+  }
+
+  const item = items.find(i => i.x === nx && i.y === ny);
+  const grows = !!item && (item.kind === 'fruit' || item.kind === 'golden');
+  // The tail moves out of the way this tick unless we're growing.
+  const body = grows ? snake : snake.slice(0, -1);
+  const hitSelf = body.some(s => s.x === nx && s.y === ny);
+  const hitRock = obstacles.has(cellKey(nx, ny));
+  if ((hitSelf || hitRock) && !isGhost() && !useShield()) {
+    return die(hitRock ? 'You crashed into a rock' : 'You bit your own tail');
+  }
+
+  snake.unshift({ x: nx, y: ny });
+  if (!grows) snake.pop();
+  if (item) consume(item);
+  if (state === 'playing' && effects.magnet > gameTime && tickCount % 2 === 0) magnetPull();
+}
+
+function consume(item) {
+  items.splice(items.indexOf(item), 1);
+  const cx = item.x + .5, cy = item.y + .5, t = item.type;
+
+  if (item.kind === 'fruit' || item.kind === 'golden') {
+    combo = (gameTime - lastEatAt <= COMBO_WINDOW) ? Math.min(combo + 1, MAX_COMBO) : 1;
+    lastEatAt = gameTime;
+    maxCombo = Math.max(maxCombo, combo);
+    const mult = combo * (effects.double > gameTime ? 2 : 1);
+    const pts = t.score * mult;
+    score += pts;
+    energy = Math.min(100, energy + t.energy);
+    burst(cx, cy, t.glow, item.kind === 'golden' ? 30 : 14, item.kind === 'golden' ? 6 : 4);
+    floater(cx, cy - .2, '+' + pts, mult > 1 ? '#fde047' : '#ffffff', .5);
+    if (combo >= 2) floater(cx, cy - .9, `COMBO x${combo}`, '#fb923c', .38);
+    if (item.kind === 'golden') {
+      goldenCount++; sfx.golden(); shake = Math.max(shake, 4);
+    } else {
+      sfx.eat(combo);
+      fruitsEaten++;
+      if (!spawnFruit()) return die('You filled the whole board!', true);
+      if (fruitsEaten % FRUITS_PER_LEVEL === 0) levelUp();
+    }
+  } else if (item.kind === 'hazard') {
+    if (isGhost()) {
+      burst(cx, cy, '#94a3b8', 10); floater(cx, cy - .2, 'Blocked!', '#94a3b8', .4); sfx.poof();
+    } else if (!useShield()) {
+      return die(`You ate a poisonous ${t.name.toLowerCase()} ${t.emoji}`);
+    }
+  } else if (item.kind === 'power') {
+    applyPower(t, cx, cy);
+  }
+  checkAchievements();
+}
+
+function applyPower(p, cx, cy) {
+  powerCount++;
+  sfx.power();
+  burst(cx, cy, p.color, 18, 5);
+  floater(cx, cy - .2, p.name, p.color, .42);
+  if (p.id === 'shield') shield = true;
+  else if (p.dur) effects[p.id] = gameTime + p.dur;
+  else if (p.id === 'shrink') {
+    const cut = Math.min(4, snake.length - 3);
+    for (let i = 0; i < cut; i++) {
+      const s = snake.pop();
+      burst(s.x + .5, s.y + .5, skin.rainbow ? '#ffffff' : skin.body, 5, 3);
+    }
+    energy = Math.min(100, energy + 10);
+  }
+}
+
+function useShield() {
+  if (!shield) return false;
+  shield = false; shieldSaved = true;
+  ghostUntil = gameTime + 1500;
+  const h = snake[0];
+  burst(h.x + .5, h.y + .5, POWERS.shield.color, 24, 6);
+  floater(h.x + .5, h.y - .3, 'SHIELD!', POWERS.shield.color, .5);
+  shake = Math.max(shake, 7); flash = .5;
+  sfx.shield(); vibrate(60);
+  return true;
+}
+
+function magnetPull() {
+  const h = snake[0];
+  const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
+  for (const it of items) {
+    if (it.kind !== 'fruit' && it.kind !== 'golden') continue;
+    const dx = h.x - it.x, dy = h.y - it.y;
+    if (Math.abs(dx) + Math.abs(dy) <= 1) continue;
+    const moves = Math.abs(dx) >= Math.abs(dy)
+      ? [[Math.sign(dx), 0], [0, Math.sign(dy)]]
+      : [[0, Math.sign(dy)], [Math.sign(dx), 0]];
+    for (const [mx, my] of moves) {
+      if (!mx && !my) continue;
+      const nx = it.x + mx, ny = it.y + my;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || !isFree(nx, ny, snakeSet)) continue;
+      it.fromX = it.x; it.fromY = it.y; it.movedAt = gameTime;
+      it.x = nx; it.y = ny;
+      break;
+    }
+  }
+}
+
+function levelUp() {
+  level++;
+  sfx.level();
+  let sub = 'Speed up!';
+  if (mode.maze) {
+    for (let i = 0; i < 3; i++) {
+      const c = randomFree(5);
+      if (c) addRock(c.x, c.y, gameTime);
+    }
+    sub = 'New rocks appeared!';
+  }
+  banner = { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
+  checkAchievements();
+}
+
+function die(reason, win = false) {
+  state = 'over';
+  acc = 0; queue = [];
+  prevSnake = snake.map(s => ({ ...s }));
+  deathReason = reason; isWin = win;
+  const h = snake[0];
+  if (win) {
+    sfx.level();
+    for (let i = 0; i < 6; i++) burst(rand(2, COLS - 2), rand(2, ROWS - 2), ['#fde047', '#4ade80', '#38bdf8', '#f472b6'][i % 4], 24, 6);
+  } else {
+    sfx.die(); vibrate(160);
+    shake = reduceMotion ? 0 : 16; flash = 1;
+    burst(h.x + .5, h.y + .5, '#ef4444', 30, 7);
+    snake.forEach((s, i) => { if (i % 2 === 0) burst(s.x + .5, s.y + .5, '#94a3b8', 3, 2); });
+  }
+  newBest = score > (save.bests[bestKey()] || 0);
+  if (newBest) save.bests[bestKey()] = score;
+  save.stats.games++;
+  save.stats.fruits += fruitsEaten;
+  save.stats.bestLength = Math.max(save.stats.bestLength, snake.length);
+  save.stats.playMs += gameTime;
+  checkAchievements();
+  persist();
+  const token = gameId;
+  setTimeout(() => { if (token === gameId && state === 'over') showOver(); }, win ? 700 : 950);
+}
+
+function update(dt) {
+  // Visual effects keep animating in every state.
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000;
+    const f = Math.pow(0.02, dt / 1000);
+    p.vx *= f; p.vy *= f;
+    p.life -= dt * p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= dt / 1000 * 1.1; f.life -= dt / 950;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+  if (banner) { banner.t += dt; if (banner.t >= banner.dur) banner = null; }
+  shake = Math.max(0, shake - dt * 0.035);
+  flash = Math.max(0, flash - dt / 500);
+
+  if (state === 'countdown') {
+    const before = Math.ceil(countdownMs / COUNT_STEP);
+    countdownMs -= dt;
+    const after = Math.ceil(countdownMs / COUNT_STEP);
+    if (countdownMs <= 0) {
+      state = 'playing';
+      banner = { text: 'GO!', sub: '', t: 0, dur: 700 };
+      sfx.count(true);
+    } else if (after !== before) sfx.count(false);
+    return;
+  }
+  if (state !== 'playing') return;
+
+  gameTime += dt;
+  acc += dt;
+  let step = currentStep(), guard = 0;
+  while (acc >= step && state === 'playing' && guard++ < 4) {
+    acc -= step;
+    tick();
+    step = currentStep();
+  }
+  if (state !== 'playing') return;
+
+  if (mode.energy) {
+    energy -= diff.drain * (1 + 0.05 * (level - 1)) * dt / 1000;
+    if (energy <= 0) { energy = 0; return die('You ran out of energy'); }
+  }
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.expires && gameTime >= it.expires) {
+      items.splice(i, 1);
+      burst(it.x + .5, it.y + .5, '#64748b', 8, 2.5);
+    }
+  }
+  if (mode.hazards && gameTime >= nextHazardAt) { spawnHazard(); scheduleHazard(); }
+  if (gameTime >= nextPowerAt) { spawnPower(); nextPowerAt = gameTime + rand(11000, 18000); }
+  if (gameTime >= nextGoldenAt) {
+    if (!items.some(i => i.kind === 'golden')) spawnGolden();
+    nextGoldenAt = gameTime + rand(20000, 32000);
+  }
+  if (combo > 0 && gameTime - lastEatAt > COMBO_WINDOW) combo = 0;
+}
+
+// ---------- Effects ----------
+function burst(cx, cy, color, n = 12, speed = 4) {
+  if (particles.length > 500) return;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = (0.3 + Math.random()) * speed;
+    particles.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1,
+      decay: 1 / rand(350, 750), size: rand(.05, .14), color });
+  }
+}
+function floater(x, y, text, color, size = .45) {
+  floaters.push({ x, y, text, color, size, life: 1 });
+}
+
+// ---------- Achievements ----------
+function checkAchievements() {
+  const g = { fruits: fruitsEaten, maxCombo, length: snake.length, level, golden: goldenCount,
+    shieldSaved, score, diff: diffId, mode: modeId };
+  for (const a of ACHIEVEMENTS) {
+    if (save.achievements[a.id] || !a.test(g)) continue;
+    save.achievements[a.id] = Date.now();
+    toast(`${a.icon} Achievement: ${a.name}`);
+    sfx.achieve();
+    persist();
+  }
+}
+
+// ================================================================
+// Rendering
+// ================================================================
+const canvas = $('board'), ctx = canvas.getContext('2d');
+const wrapEl = $('boardWrap');
+const bg = document.createElement('canvas');
+const spriteCache = new Map();
+let W = 0, CELL = 0, DPR = 1;
+
+function resize() {
+  const w = wrapEl.clientWidth;
+  if (!w) return;
+  W = w; DPR = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(W * DPR);
+  CELL = W / COLS;
+  spriteCache.clear();
+  buildBg();
+}
+function buildBg() {
+  bg.width = canvas.width; bg.height = canvas.height;
+  const c = bg.getContext('2d'), w = bg.width, cs = w / COLS;
+  c.fillStyle = '#070d1f'; c.fillRect(0, 0, w, w);
+  c.fillStyle = '#0a1328';
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if ((x + y) % 2) c.fillRect(Math.floor(x * cs), Math.floor(y * cs), Math.ceil(cs), Math.ceil(cs));
+  }
+  const v = c.createRadialGradient(w / 2, w / 2, w * .25, w / 2, w / 2, w * .75);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.35)');
+  c.fillStyle = v; c.fillRect(0, 0, w, w);
+}
+function emojiSprite(e) {
+  let s = spriteCache.get(e);
+  if (s) return s;
+  const px = Math.max(8, Math.ceil(CELL * DPR * 1.2));
+  s = document.createElement('canvas'); s.width = s.height = px;
+  const c = s.getContext('2d');
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = `${Math.floor(px * .78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  c.fillText(e, px / 2, px / 2 + px * .05);
+  spriteCache.set(e, s);
+  return s;
+}
+function rockSprite() {
+  let s = spriteCache.get('#rock');
+  if (s) return s;
+  const px = Math.max(8, Math.ceil(CELL * DPR));
+  s = document.createElement('canvas'); s.width = s.height = px;
+  const c = s.getContext('2d'), p = px * .06;
+  const g = c.createLinearGradient(0, 0, px, px);
+  g.addColorStop(0, '#6b7a90'); g.addColorStop(1, '#2b3647');
+  c.fillStyle = g; rr(c, p, p, px - 2 * p, px - 2 * p, px * .24); c.fill();
+  c.lineWidth = Math.max(1, px * .05); c.strokeStyle = 'rgba(2,6,23,.55)'; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.2)'; rr(c, px * .2, px * .16, px * .34, px * .13, px * .06); c.fill();
+  c.fillStyle = 'rgba(2,6,23,.25)'; c.beginPath(); c.arc(px * .66, px * .66, px * .09, 0, Math.PI * 2); c.fill();
+  spriteCache.set('#rock', s);
+  return s;
+}
+
+function snakeColor(i, n, now) {
+  const t = n > 1 ? i / (n - 1) : 0;
+  if (skin.rainbow) return `hsl(${(((i * 14 - now * .08) % 360) + 360) % 360},85%,${60 - t * 12}%)`;
+  return mixHex(skin.body, skin.tail, t);
+}
+
+function render(now) {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#070d1f'; ctx.fillRect(0, 0, W, W);
+  if (shake > 0.2) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  ctx.drawImage(bg, 0, 0, W, W);
+
+  drawRocks();
+  drawItems(now);
+  drawSnake(now);
+  drawParticles();
+  drawFloaters();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (flash > 0) { ctx.fillStyle = `rgba(239,68,68,${flash * .28})`; ctx.fillRect(0, 0, W, W); }
+  if (effects && effects.slow > gameTime && state !== 'menu') {
+    ctx.fillStyle = 'rgba(167,139,250,.07)'; ctx.fillRect(0, 0, W, W);
+  }
+  drawBanner();
+  if (state === 'countdown') drawCountdown();
+}
+
+function drawRocks() {
+  const sp = rockSprite();
+  for (const r of obstacleList) {
+    const s = r.born ? easeOutBack(clamp((gameTime - r.born) / 350, 0, 1)) : 1;
+    const size = CELL * s;
+    ctx.drawImage(sp, (r.x + .5) * CELL - size / 2, (r.y + .5) * CELL - size / 2, size, size);
+  }
+}
+
+function drawItems(now) {
+  for (const it of items) {
+    let ix = it.x, iy = it.y;
+    if (it.movedAt != null && gameTime - it.movedAt < 120) {
+      const k = (gameTime - it.movedAt) / 120;
+      ix = it.fromX + (it.x - it.fromX) * k; iy = it.fromY + (it.y - it.fromY) * k;
+    }
+    const cx = (ix + .5) * CELL, cy = (iy + .5) * CELL;
+    const age = gameTime - it.born;
+    const sc = easeOutBack(clamp(age / 300, 0, 1));
+    const bob = Math.sin(now / 280 + it.x * 1.3 + it.y) * CELL * .05;
+    const glow = it.kind === 'power' ? it.type.color : it.type.glow;
+    const pulse = it.kind === 'hazard' ? .55 + .25 * Math.sin(now / 120) : .4;
+
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, CELL * .95);
+    g.addColorStop(0, rgba(glow, pulse * .8)); g.addColorStop(1, rgba(glow, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, CELL * .95, 0, Math.PI * 2); ctx.fill();
+
+    if (it.expires) {
+      const left = clamp((it.expires - gameTime) / it.life, 0, 1);
+      ctx.strokeStyle = rgba(glow, .9); ctx.lineWidth = Math.max(1.5, CELL * .07); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx, cy, CELL * .56, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+      // Blink during the last 1.5 seconds.
+      if (it.expires - gameTime < 1500 && Math.floor(now / 110) % 2) continue;
+    }
+    if (it.kind === 'golden') {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(now / 600);
+      ctx.strokeStyle = 'rgba(253,224,71,.5)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(CELL * .45, 0); ctx.lineTo(CELL * .72, 0); ctx.stroke(); }
+      ctx.restore();
+    }
+    const size = CELL * .95 * sc;
+    ctx.drawImage(emojiSprite(it.type.emoji), cx - size / 2, cy - size / 2 + bob, size, size);
+  }
+}
+
+function drawSnake(now) {
+  if (!snake) return;
+  const step = currentStep();
+  const alpha = clamp(acc / step, 0, 1);
+  const n = snake.length;
+  const pts = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const c = snake[i], p = prevSnake[i] || c;
+    const jump = Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1;   // wrapped through an edge
+    const x = jump ? c.x : p.x + (c.x - p.x) * alpha;
+    const y = jump ? c.y : p.y + (c.y - p.y) * alpha;
+    pts[i] = { x: (x + .5) * CELL, y: (y + .5) * CELL };
+  }
+  const width = i => CELL * (.8 - .3 * (n > 1 ? i / (n - 1) : 0));
+  const linked = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < CELL * 1.5;
+  const ghost = isGhost() && state !== 'over';
+  ctx.globalAlpha = ghost ? .5 + .3 * Math.sin(now / 55) : 1;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // Outline pass, then colour pass (tail first so the head sits on top).
+  ctx.strokeStyle = 'rgba(0,0,0,.4)';
+  for (let i = n - 1; i > 0; i--) {
+    if (!linked(pts[i], pts[i - 1])) continue;
+    ctx.lineWidth = width(i) + CELL * .12;
+    ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); ctx.stroke();
+  }
+  for (let i = n - 1; i > 0; i--) {
+    ctx.strokeStyle = snakeColor(i, n, now);
+    ctx.lineWidth = width(i);
+    ctx.beginPath();
+    if (linked(pts[i], pts[i - 1])) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); }
+    else { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i].x + .01, pts[i].y); }
+    ctx.stroke();
+  }
+  // Scale highlights.
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  for (let i = 2; i < n; i += 2) {
+    ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, width(i) * .2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Head.
+  const h = pts[0], r = CELL * .45, fx = dir.x, fy = dir.y, sx = -fy, sy = fx;
+  const dead = state === 'over' && !isWin;
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(h.x, h.y, r + CELL * .06, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skin.rainbow ? snakeColor(0, n, now) : skin.head;
+  ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.fill();
+
+  // Tongue flick.
+  if (!dead && state !== 'menu' && now % 1700 < 260) {
+    const bx = h.x + fx * r * .95, by = h.y + fy * r * .95;
+    const tx = bx + fx * CELL * .3, ty = by + fy * CELL * .3;
+    ctx.strokeStyle = '#f43f5e'; ctx.lineWidth = Math.max(1.2, CELL * .06);
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty);
+    ctx.lineTo(tx + fx * CELL * .1 + sx * CELL * .08, ty + fy * CELL * .1 + sy * CELL * .08);
+    ctx.moveTo(tx, ty); ctx.lineTo(tx + fx * CELL * .1 - sx * CELL * .08, ty + fy * CELL * .1 - sy * CELL * .08);
+    ctx.stroke();
+  }
+  // Eyes.
+  for (const side of [1, -1]) {
+    const ex = h.x + fx * CELL * .1 + sx * CELL * .2 * side;
+    const ey = h.y + fy * CELL * .1 + sy * CELL * .2 * side;
+    if (dead) {
+      const d = CELL * .09;
+      ctx.strokeStyle = '#0f172a'; ctx.lineWidth = Math.max(1.5, CELL * .06);
+      ctx.beginPath(); ctx.moveTo(ex - d, ey - d); ctx.lineTo(ex + d, ey + d); ctx.moveTo(ex + d, ey - d); ctx.lineTo(ex - d, ey + d); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, CELL * .12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(ex + fx * CELL * .045, ey + fy * CELL * .045, CELL * .065, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Shield aura.
+  if (shield && state !== 'over') {
+    const pr = CELL * (.72 + .06 * Math.sin(now / 160));
+    ctx.strokeStyle = 'rgba(56,189,248,.85)'; ctx.lineWidth = Math.max(1.5, CELL * .08);
+    ctx.setLineDash([CELL * .18, CELL * .12]); ctx.lineDashOffset = -now / 40;
+    ctx.beginPath(); ctx.arc(h.x, h.y, pr, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (effects && effects.magnet > gameTime && state === 'playing') {
+    const k = (now % 900) / 900;
+    ctx.strokeStyle = `rgba(244,114,182,${.5 * (1 - k)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(h.x, h.y, CELL * (2.2 - 1.6 * k), 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life, 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x * CELL, p.y * CELL, p.size * CELL * (.5 + p.life * .5), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawFloaters() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.life * 1.6, 0, 1);
+    ctx.font = `800 ${Math.round(CELL * f.size * 1.6)}px system-ui, sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2,6,23,.85)';
+    ctx.strokeText(f.text, f.x * CELL, f.y * CELL);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x * CELL, f.y * CELL);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBanner() {
+  if (!banner) return;
+  const k = banner.t / banner.dur;
+  const a = k < .15 ? k / .15 : k > .75 ? (1 - k) / .25 : 1;
+  const s = k < .15 ? .6 + .4 * easeOutBack(k / .15) : 1;
+  ctx.save();
+  ctx.globalAlpha = clamp(a, 0, 1);
+  ctx.translate(W / 2, W * .38); ctx.scale(s, s);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.round(W * .11)}px system-ui, sans-serif`;
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(2,6,23,.8)';
+  ctx.strokeText(banner.text, 0, 0);
+  const g = ctx.createLinearGradient(-W * .3, 0, W * .3, 0);
+  g.addColorStop(0, '#4ade80'); g.addColorStop(1, '#22d3ee');
+  ctx.fillStyle = g; ctx.fillText(banner.text, 0, 0);
+  if (banner.sub) {
+    ctx.font = `700 ${Math.round(W * .04)}px system-ui, sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeText(banner.sub, 0, W * .08);
+    ctx.fillStyle = '#e2e8f0'; ctx.fillText(banner.sub, 0, W * .08);
+  }
+  ctx.restore();
+}
+function drawCountdown() {
+  const n = Math.ceil(countdownMs / COUNT_STEP);
+  const k = 1 - (countdownMs % COUNT_STEP) / COUNT_STEP;
+  ctx.fillStyle = 'rgba(2,6,23,.35)'; ctx.fillRect(0, 0, W, W);
+  ctx.save();
+  ctx.translate(W / 2, W / 2);
+  const s = 1.3 - .3 * easeOutBack(clamp(k * 2, 0, 1));
+  ctx.scale(s, s);
+  ctx.globalAlpha = 1 - clamp((k - .7) / .3, 0, 1) * .8;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.round(W * .22)}px system-ui, sans-serif`;
+  ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(2,6,23,.8)'; ctx.strokeText(n, 0, 0);
+  ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 0);
+  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillText(`${mode.name} · ${diff.name}`, W / 2, W * .68);
+}
+
+// ================================================================
+// HUD & screens
+// ================================================================
+const el = {
+  score: $('score'), level: $('level'), length: $('length'), best: $('best'),
+  energyText: $('energyText'), energyFill: $('energyFill'),
+  combo: $('combo'), comboText: $('comboText'), comboFill: $('comboFill'), chips: $('chips'),
+  soundBtn: $('soundBtn'), pauseBtn: $('pauseBtn'), toast: $('toast'),
+  menu: $('menu'), pauseScreen: $('pauseScreen'), overScreen: $('overScreen'), achScreen: $('achScreen'),
+};
+const hudCache = {};
+function setText(key, node, value, pop) {
+  if (hudCache[key] === value) return;
+  const had = key in hudCache;
+  hudCache[key] = value;
+  node.textContent = value;
+  if (pop && had) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
+}
+function setStyle(key, fn, value) { if (hudCache[key] !== value) { hudCache[key] = value; fn(value); } }
+
+function updateHud() {
+  setText('score', el.score, String(score), true);
+  setText('level', el.level, String(level), true);
+  setText('length', el.length, String(snake.length));
+  setText('best', el.best, String(Math.max(best, score)));
+
+  if (mode.energy) {
+    const e = clamp(energy, 0, 100);
+    setText('energyText', el.energyText, Math.ceil(e) + '%');
+    setStyle('energyW', v => el.energyFill.style.width = v, e.toFixed(1) + '%');
+    setStyle('energyC', v => el.energyFill.className = v, e <= 20 ? 'low' : e <= 45 ? 'mid' : '');
+  } else {
+    setText('energyText', el.energyText, '∞');
+    setStyle('energyW', v => el.energyFill.style.width = v, '100%');
+    setStyle('energyC', v => el.energyFill.className = v, 'inf');
+  }
+
+  const comboLeft = combo >= 2 ? clamp(1 - (gameTime - lastEatAt) / COMBO_WINDOW, 0, 1) : 0;
+  setText('combo', el.comboText, combo >= 2 ? 'x' + combo : '—', true);
+  setStyle('comboOff', v => el.combo.classList.toggle('off', v), combo < 2);
+  setStyle('comboW', v => el.comboFill.style.width = v, Math.round(comboLeft * 100) + '%');
+
+  const chips = [];
+  if (shield) chips.push([`${POWERS.shield.emoji} Shield`, POWERS.shield.color]);
+  for (const k of ['slow', 'double', 'magnet']) {
+    const left = effects[k] - gameTime;
+    if (left > 0) chips.push([`${POWERS[k].emoji} ${Math.ceil(left / 1000)}s`, POWERS[k].color]);
+  }
+  if (isGhost() && state !== 'over') chips.push(['👻 Invulnerable', '#e2e8f0']);
+  const sig = chips.map(c => c[0]).join('|');
+  setStyle('chips', () => {
+    el.chips.innerHTML = chips.map(([t, c]) => `<span class="chip" style="--c:${c}">${t}</span>`).join('');
+  }, sig);
+
+  const canPause = state === 'playing' || state === 'countdown' || state === 'paused';
+  setStyle('pauseIcon', v => el.pauseBtn.textContent = v, state === 'paused' ? '▶' : '⏸');
+  setStyle('pauseDis', v => el.pauseBtn.disabled = v, !canPause);
+  setStyle('sound', v => el.soundBtn.textContent = v, save.settings.sound ? '🔊' : '🔇');
+}
+
+function showScreen(id) {
+  for (const s of [el.menu, el.pauseScreen, el.overScreen, el.achScreen]) s.classList.toggle('hidden', s.id !== id);
+}
+
+function showOver() {
+  $('overTitle').textContent = isWin ? '🎉 You Win!' : 'Game Over';
+  $('overTitle').className = 'ov-title ' + (isWin ? 'win' : 'bad');
+  $('overReason').textContent = deathReason;
+  $('finalScore').textContent = score;
+  $('newBestBadge').classList.toggle('hidden', !newBest);
+  $('stLevel').textContent = level;
+  $('stLength').textContent = snake.length;
+  $('stFruits').textContent = fruitsEaten;
+  $('stCombo').textContent = 'x' + maxCombo;
+  $('stTime').textContent = fmtTime(gameTime);
+  $('stPowers').textContent = powerCount;
+  showScreen('overScreen');
+  $('againBtn').focus({ preventScroll: true });
+}
+
+function goMenu() {
+  gameId++;
+  state = 'menu';
+  setupGame();
+  buildMenu();
+  showScreen('menu');
+}
+
+function pause() {
+  if (state !== 'playing' && state !== 'countdown') return;
+  resumeState = state; state = 'paused';
+  showScreen('pauseScreen');
+}
+function resume() {
+  if (state !== 'paused') return;
+  state = resumeState;
+  showScreen(null);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+// ---------- Menu ----------
+function buildMenu() {
+  const s = save.settings;
+  $('modes').innerHTML = Object.entries(MODES).map(([id, m]) =>
+    `<button class="mode${id === s.mode ? ' sel' : ''}" data-mode="${id}"><span class="ic">${m.icon}</span><span><b>${m.name}</b><small>${m.desc}</small></span></button>`).join('');
+  $('diffs').innerHTML = Object.entries(DIFFS).map(([id, d]) =>
+    `<button class="${id === s.diff ? 'sel' : ''}" data-diff="${id}">${d.name}</button>`).join('');
+  $('skins').innerHTML = Object.entries(SKINS).map(([id, k]) => {
+    const sw = k.rainbow ? 'conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#8b5cf6,#f43f5e)' : `linear-gradient(135deg, ${k.head}, ${k.body} 55%, ${k.tail})`;
+    return `<button class="skin${id === s.skin ? ' sel' : ''}" data-skin="${id}" title="${k.name}" aria-label="${k.name} skin" style="--sw:${sw}"></button>`;
+  }).join('');
+  const b = save.bests[bestKey()] || 0;
+  $('menuBest').textContent = `Best (${MODES[s.mode].name} · ${DIFFS[s.diff].name}): ${b}`;
+  const got = ACHIEVEMENTS.filter(a => save.achievements[a.id]).length;
+  $('achBtn').textContent = `🏆 ${got}/${ACHIEVEMENTS.length}`;
+  hudCache.best = null;
+}
+function buildAchievements() {
+  $('achList').innerHTML = ACHIEVEMENTS.map(a =>
+    `<div class="ach${save.achievements[a.id] ? '' : ' locked'}"><span class="ic">${a.icon}</span><span><b>${a.name}</b><small>${a.desc}</small></span></div>`).join('') +
+    `<div class="hint">${save.stats.games} games played · ${save.stats.fruits} fruits eaten · ${fmtTime(save.stats.playMs)} total</div>`;
+}
+$('menu').addEventListener('click', e => {
+  const m = e.target.closest('[data-mode]'), d = e.target.closest('[data-diff]'), k = e.target.closest('[data-skin]');
+  if (!m && !d && !k) return;
+  if (m) save.settings.mode = m.dataset.mode;
+  if (d) save.settings.diff = d.dataset.diff;
+  if (k) save.settings.skin = k.dataset.skin;
+  persist(); sfx.click();
+  setupGame(); buildMenu();
+});
+
+function buildLegend() {
+  $('legend').innerHTML = `
+    <div class="lg-group"><h3>Fruit · points</h3>${FRUITS.map(f => `<span title="${f.name}: +${f.energy}% energy">${f.emoji} +${f.score}</span>`).join('')}<span class="gold" title="Rare, disappears quickly">${GOLDEN.emoji} +${GOLDEN.score}</span></div>
+    <div class="lg-group"><h3>Poison</h3>${HAZARDS.map(h => `<span class="bad" title="${h.name}">${h.emoji} ☠</span>`).join('')}</div>
+    <div class="lg-group"><h3>Power-ups</h3>${Object.values(POWERS).map(p => `<span title="${p.desc}">${p.emoji} ${p.name}</span>`).join('')}</div>`;
+}
+
+// ---------- Toasts ----------
+const toastQueue = [];
+let toastBusy = false;
+function toast(text) { toastQueue.push(text); if (!toastBusy) nextToast(); }
+function nextToast() {
+  const t = toastQueue.shift();
+  if (t == null) { toastBusy = false; return; }
+  toastBusy = true;
+  el.toast.textContent = t;
+  el.toast.classList.add('show');
+  setTimeout(() => { el.toast.classList.remove('show'); setTimeout(nextToast, 350); }, 2200);
+}
+
+// ================================================================
+// Input
+// ================================================================
+function queueDir(nd) {
+  if (state !== 'playing' && state !== 'countdown') return;
+  const last = queue.length ? queue[queue.length - 1] : dir;
+  if (nd === last || (nd.x === -last.x && nd.y === -last.y)) return;
+  if (queue.length < 3) queue.push(nd);
+}
+function toggleSound() {
+  save.settings.sound = !save.settings.sound;
+  persist();
+  if (save.settings.sound) sfx.click();
+}
+
+const KEYMAP = { arrowup: U, w: U, arrowdown: D, s: D, arrowleft: L, a: L, arrowright: R, d: R };
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  // Let a focused button handle its own Enter/Space.
+  if ((k === 'enter' || k === ' ') && e.target.closest && e.target.closest('button')) return;
+
+  if (KEYMAP[k]) {
+    if (state === 'playing' || state === 'countdown') { e.preventDefault(); queueDir(KEYMAP[k]); }
+    return;
+  }
+  if (k === 'm') { toggleSound(); return; }
+  const confirm = k === 'enter' || k === ' ';
+  switch (state) {
+    case 'playing': case 'countdown':
+      if (k === 'p' || k === 'escape' || k === ' ') { e.preventDefault(); pause(); }
+      break;
+    case 'paused':
+      if (k === 'p' || k === 'escape' || confirm) { e.preventDefault(); resume(); }
+      break;
+    case 'over':
+      if (confirm) { e.preventDefault(); startGame(); }
+      else if (k === 'escape') goMenu();
+      break;
+    case 'menu':
+      if (!el.achScreen.classList.contains('hidden')) { if (k === 'escape' || confirm) { e.preventDefault(); showScreen('menu'); } }
+      else if (confirm) { e.preventDefault(); startGame(); }
+      break;
+  }
+});
+
+// Swipe on the board.
+let swipe = null;
+canvas.addEventListener('pointerdown', e => { swipe = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+canvas.addEventListener('pointermove', e => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+  queueDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? R : L) : (dy > 0 ? D : U));
+  swipe.x = e.clientX; swipe.y = e.clientY;
+});
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(ev, () => { swipe = null; });
+
+// D-pad.
+document.querySelectorAll('.dbtn').forEach(btn => {
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    queueDir(DIRS[btn.dataset.dir]);
+    btn.classList.add('on');
+  });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, () => btn.classList.remove('on'));
+});
+
+// Buttons.
+$('playBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+$('restartBtn').addEventListener('click', startGame);
+$('resumeBtn').addEventListener('click', resume);
+$('pauseMenuBtn').addEventListener('click', goMenu);
+$('overMenuBtn').addEventListener('click', goMenu);
+$('achBtn').addEventListener('click', () => { buildAchievements(); showScreen('achScreen'); });
+$('achBack').addEventListener('click', () => showScreen('menu'));
+el.soundBtn.addEventListener('click', toggleSound);
+el.pauseBtn.addEventListener('click', () => state === 'paused' ? resume() : pause());
+// Drop focus after mouse/touch clicks so Space doesn't re-trigger the button mid-game.
+document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
+
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+// ================================================================
+// Boot
+// ================================================================
+new ResizeObserver(resize).observe(wrapEl);
+resize();
+setupGame();
+buildMenu();
+buildLegend();
+
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(64, now - lastT);
+  lastT = now;
+  update(dt);
+  render(now);
+  updateHud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
