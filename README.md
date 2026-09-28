@@ -16,6 +16,8 @@ A single-file snake game for the browser. It has no dependencies and no build st
 - **Poison** (🥥 🥚): deadly, but each one disappears after a few seconds.
 - **Golden star** 🌟: a rare, short-lived bonus worth 75 points.
 - **Power-ups**: 🛡️ Shield, ⏳ Slow-mo, 💎 Double points, 🧲 Magnet, ✂️ Shrink.
+- **Daily Challenge** 📅: every player in the world gets the same board, fruit order and spawn timing each day (UTC). The mode rotates between Classic, Portal and Maze on Medium difficulty, and your best score and attempts for the day are tracked.
+- **Share score** 📤: the game-over screen builds a 1080×1920 score card (a snapshot of the board, your score and stats, and the game link) that fits TikTok, Instagram Stories and WhatsApp Status. On phones it opens the share sheet. On desktop it downloads the image and copies a caption. To add your TikTok handle to every card, set `CREATOR_HANDLE` in `index.html`.
 - **Secret level** 🌌: see the spoiler below.
 - **5 snake skins**, including an animated rainbow skin.
 - **15 achievements** (2 hidden) and lifetime stats.
@@ -30,6 +32,7 @@ A single-file snake game for the browser. It has no dependencies and no build st
 | Move | Arrow keys / WASD | Swipe on the board or use the D-pad |
 | Pause / resume | P, Space, Esc | ⏸ button |
 | Start / replay | Enter | Buttons |
+| Share score (game-over screen) | S | 📤 Share button |
 | Mute | M | 🔊 button |
 
 <details>
