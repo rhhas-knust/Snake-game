@@ -28,8 +28,8 @@
   .app { width: min(100%, 520px); padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
 
   /* ---------- Header & HUD ---------- */
-  .top { display: flex; align-items: center; justify-content: space-between; }
-  h1 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  h1 { margin: 0; font-size: 1.6rem; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
   h1 em { font-style: normal; background: linear-gradient(90deg, #4ade80, #22d3ee); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .top-actions { display: flex; gap: 8px; }
   .icon-btn {
@@ -65,9 +65,10 @@
   .chip { font-size: .72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; background: var(--panel-2); border: 1px solid var(--c, var(--line)); color: var(--text); white-space: nowrap; }
 
   /* ---------- Board ---------- */
+  /* JS (layout) sets the exact width so the board fills whatever space the screen has. */
   .board-wrap {
-    position: relative; margin: 0 auto; aspect-ratio: 1;
-    width: min(100%, calc(100vh - 290px)); width: min(100%, calc(100dvh - 290px)); min-width: 260px;
+    position: relative; margin: 0 auto; aspect-ratio: 1; flex: none;
+    width: min(100%, 480px);
     border-radius: 18px; overflow: hidden; background: #070d1f;
     border: 2px solid var(--line);
     box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6);
@@ -78,27 +79,30 @@
   .board-wrap[data-mode="secret"] { border-color: #a855f7; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 28px rgb(168 85 247 / .55); }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
 
+  /* Overlay text is sized in em from --ov-fs, which JS sets from the board size,
+     so menus and the game-over screen shrink to fit small phone boards. */
   .overlay {
-    position: absolute; inset: 0; display: flex; overflow-y: auto; padding: 14px;
+    position: absolute; inset: 0; display: flex; overflow-y: auto; padding: .8em;
+    font-size: var(--ov-fs, 16px);
     background: rgb(2 6 23 / .74); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
     animation: fade .2s ease-out;
   }
-  .ov-inner { margin: auto; width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center; }
+  .ov-inner { margin: auto; width: 100%; max-width: 24em; display: flex; flex-direction: column; align-items: center; gap: .55em; text-align: center; }
   @keyframes fade { from { opacity: 0; } }
-  .label { align-self: flex-start; font-size: .64rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; color: var(--muted); margin-bottom: -4px; }
+  .label { align-self: flex-start; font-size: .64em; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; color: var(--muted); margin-bottom: -4px; }
 
   .modes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; width: 100%; }
   .mode {
     display: flex; gap: 8px; align-items: center; text-align: left; cursor: pointer;
     background: var(--panel); border: 1.5px solid var(--line); border-radius: 12px; padding: 7px 8px; color: var(--text);
   }
-  .mode .ic { font-size: 1.25rem; }
-  .mode b { display: block; font-size: .84rem; }
-  .mode small { display: block; color: var(--muted); font-size: .66rem; line-height: 1.2; }
+  .mode .ic { font-size: 1.25em; }
+  .mode b { display: block; font-size: .84em; }
+  .mode small { display: block; color: var(--muted); font-size: .66em; line-height: 1.2; }
   .mode.sel { border-color: var(--accent); background: rgb(34 197 94 / .12); }
 
   .seg { display: flex; width: 100%; padding: 3px; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
-  .seg button { flex: 1; background: none; border: 0; color: var(--muted); padding: 7px 0; border-radius: 9px; font-weight: 700; font-size: .8rem; cursor: pointer; }
+  .seg button { flex: 1; background: none; border: 0; color: var(--muted); padding: 7px 0; border-radius: 9px; font-weight: 700; font-size: .8em; cursor: pointer; }
   .seg button.sel { background: var(--accent); color: #052e16; }
 
   .skins { display: flex; gap: 10px; justify-content: center; }
@@ -107,55 +111,55 @@
 
   .primary {
     background: linear-gradient(180deg, #4ade80, #22c55e); color: #052e16; border: 0; border-radius: 14px;
-    padding: 11px 30px; font-weight: 800; font-size: 1rem; cursor: pointer; box-shadow: 0 8px 20px -6px rgb(34 197 94 / .6);
+    padding: 11px 30px; font-weight: 800; font-size: 1em; cursor: pointer; box-shadow: 0 8px 20px -6px rgb(34 197 94 / .6);
   }
   .primary:active, .ghost-btn:active { transform: translateY(1px); }
-  .ghost-btn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 10px 18px; font-weight: 700; font-size: .9rem; cursor: pointer; }
+  .ghost-btn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 14px; padding: 10px 18px; font-weight: 700; font-size: .9em; cursor: pointer; }
   .btn-row { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
   .play-row { width: 100%; flex-wrap: nowrap; }
   .play-row .primary { flex: 1; padding: 11px 10px; }
   .daily-btn {
-    flex: 1; cursor: pointer; border-radius: 14px; padding: 6px 10px; font-weight: 800; font-size: .92rem;
+    flex: 1; cursor: pointer; border-radius: 14px; padding: 6px 10px; font-weight: 800; font-size: .92em;
     background: linear-gradient(180deg, #fde047, #f59e0b); color: #422006; border: 0;
     box-shadow: 0 8px 20px -6px rgb(245 158 11 / .55); line-height: 1.15;
   }
-  .daily-btn small { display: block; font-size: .64rem; font-weight: 700; opacity: .8; }
+  .daily-btn small { display: block; font-size: .7em; font-weight: 700; opacity: .8; }
   .share-btn {
     background: linear-gradient(90deg, #ec4899, #8b5cf6); color: #fff; border: 0; border-radius: 14px;
-    padding: 11px 18px; font-weight: 800; font-size: .95rem; cursor: pointer; box-shadow: 0 8px 20px -6px rgb(236 72 153 / .55);
+    padding: 11px 18px; font-weight: 800; font-size: .95em; cursor: pointer; box-shadow: 0 8px 20px -6px rgb(236 72 153 / .55);
   }
   .over-btns { flex-wrap: nowrap; }
-  .over-btns button { padding: 11px 14px; font-size: .92rem; white-space: nowrap; }
-  .over-tag { font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: -6px; }
+  .over-btns button { padding: 11px 14px; font-size: .92em; white-space: nowrap; }
+  .over-tag { font-size: .66em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: -6px; }
   .over-tag.daily { color: var(--gold); }
-  .menu-foot { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: .72rem; color: var(--muted); font-weight: 600; }
-  .link-btn { background: none; border: 0; color: var(--gold); font-weight: 800; font-size: .75rem; cursor: pointer; padding: 4px; }
-  .hint { font-size: .7rem; color: var(--muted); }
+  .menu-foot { display: flex; justify-content: space-between; align-items: center; width: 100%; font-size: .72em; color: var(--muted); font-weight: 600; }
+  .link-btn { background: none; border: 0; color: var(--gold); font-weight: 800; font-size: .75em; cursor: pointer; padding: 4px; }
+  .hint { font-size: .7em; color: var(--muted); }
 
-  .ov-title { font-size: 1.7rem; font-weight: 800; letter-spacing: .02em; }
+  .ov-title { font-size: 1.7em; font-weight: 800; letter-spacing: .02em; }
   .ov-title.bad { color: #f87171; }
   .ov-title.win { color: var(--gold); }
-  .over-reason { color: var(--muted); font-weight: 600; font-size: .88rem; margin-top: -6px; }
-  .final-score { font-size: 2.6rem; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
-  .final-score small { display: block; font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
-  .badge { background: linear-gradient(90deg, #f59e0b, #fde047); color: #422006; font-weight: 800; font-size: .78rem; padding: 4px 12px; border-radius: 99px; animation: pop .5s ease-out; }
+  .over-reason { color: var(--muted); font-weight: 600; font-size: .88em; margin-top: -6px; }
+  .final-score { font-size: 2.6em; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .final-score small { display: block; font-size: .27em; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: 4px; }
+  .badge { background: linear-gradient(90deg, #f59e0b, #fde047); color: #422006; font-weight: 800; font-size: .78em; padding: 4px 12px; border-radius: 99px; animation: pop .5s ease-out; }
   .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; width: 100%; }
   .stats-grid div { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 4px; }
-  .stats-grid b { display: block; font-size: 1rem; font-variant-numeric: tabular-nums; }
-  .stats-grid span { font-size: .6rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+  .stats-grid b { display: block; font-size: 1em; font-variant-numeric: tabular-nums; }
+  .stats-grid span { font-size: .6em; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
 
   .ach-list { display: flex; flex-direction: column; gap: 6px; width: 100%; }
   .ach { display: flex; gap: 10px; align-items: center; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
-  .ach .ic { font-size: 1.3rem; }
-  .ach b { display: block; font-size: .82rem; }
-  .ach small { color: var(--muted); font-size: .7rem; }
+  .ach .ic { font-size: 1.3em; }
+  .ach b { display: block; font-size: .82em; }
+  .ach small { color: var(--muted); font-size: .7em; }
   .ach.locked { opacity: .45; }
   .ach.locked .ic { filter: grayscale(1); }
 
   .toast {
     position: absolute; left: 50%; top: 10px; transform: translate(-50%, -140%);
     background: rgb(15 23 42 / .95); border: 1px solid var(--gold); color: var(--text);
-    padding: 7px 14px; border-radius: 99px; font-size: .8rem; font-weight: 700; white-space: nowrap;
+    padding: 7px 14px; border-radius: 99px; font-size: .8em; font-weight: 700; white-space: nowrap;
     transition: transform .3s cubic-bezier(.2, .9, .3, 1.3), opacity .3s; pointer-events: none; z-index: 5; opacity: 0;
   }
   .toast.show { transform: translate(-50%, 0); opacity: 1; }
@@ -175,8 +179,10 @@
   .credit a:hover { text-decoration: underline; }
   kbd { background: var(--panel-2); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px; padding: 0 5px; font-size: .72rem; color: var(--text); font-family: inherit; }
 
-  /* ---------- D-pad (touch devices) ---------- */
-  .dpad { display: none; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(2, 50px); gap: 8px; justify-content: center; }
+  /* ---------- D-pad (optional, toggled with the 🎮 button) ---------- */
+  .dpad { display: none; grid-template-columns: repeat(3, 64px); grid-template-rows: repeat(2, 52px); gap: 8px; justify-content: center; flex: none; }
+  body.pad-on .dpad { display: grid; }
+  .icon-btn.on { border-color: var(--accent); background: rgb(34 197 94 / .15); }
   .dbtn {
     background: var(--panel); border: 1px solid var(--line); color: var(--text); border-radius: 14px;
     display: flex; align-items: center; justify-content: center; font-size: 1.2rem; cursor: pointer; touch-action: none;
@@ -187,12 +193,50 @@
   .dbtn.down { grid-column: 2; grid-row: 2; }
   .dbtn.right { grid-column: 3; grid-row: 2; }
   .touch-only { display: none; }
+  .touch-btn { display: none; }
   @media (pointer: coarse) {
-    .dpad { display: grid; }
+    body.playing { overflow: hidden; overscroll-behavior: none; }
     .touch-only { display: inline; }
+    .touch-btn { display: grid; }
     .desk-only { display: none; }
-    .board-wrap { width: min(100%, calc(100vh - 400px)); width: min(100%, calc(100dvh - 400px)); }
   }
+
+  /* ---------- Phones: compact header so the board gets the space ---------- */
+  @media (max-width: 520px) {
+    .app { padding: 8px 10px 20px; gap: 7px; }
+    h1 { font-size: 1.2rem; }
+    .top-actions { gap: 6px; }
+    .icon-btn { width: 36px; height: 36px; border-radius: 10px; font-size: .95rem; }
+    .hud { gap: 6px; }
+    .stat { padding: 4px 2px; border-radius: 10px; }
+    .stat span { font-size: .56rem; }
+    .stat strong { font-size: 1rem; }
+    .meter-label { font-size: .7rem; margin-bottom: 3px; }
+    .bar { height: 8px; }
+    .sub-row { min-height: 22px; }
+    .board-wrap { border-radius: 14px; }
+  }
+
+  /* ---------- Phone held sideways: board on the left, HUD on the right ---------- */
+  @media (orientation: landscape) and (max-height: 540px) {
+    body { align-items: center; }
+    .app {
+      width: 100%; max-width: 980px; padding: 8px 12px; column-gap: 14px;
+      display: grid; grid-template-columns: auto minmax(0, 1fr); align-content: start;
+      grid-template-areas: "board top" "board hud" "board meters" "board pad" "board credit";
+    }
+    .top { grid-area: top; }
+    .hud { grid-area: hud; }
+    .meters { grid-area: meters; }
+    .board-wrap { grid-area: board; margin: 0; }
+    .dpad { grid-area: pad; }
+    .credit { grid-area: credit; }
+    .legend, details { display: none; }
+  }
+
+  /* ---------- Fullscreen (⛶): just the game, nothing else ---------- */
+  :fullscreen body, body.fs { background: var(--bg); }
+  body.fs .legend, body.fs details, body.fs .credit { display: none; }
 </style>
 </head>
 <body>
@@ -200,6 +244,8 @@
   <header class="top">
     <h1>🐍 Snake <em>Pro</em></h1>
     <div class="top-actions">
+      <button class="icon-btn touch-btn" id="padBtn" aria-label="Show arrow buttons" aria-pressed="false" title="Arrow buttons">🎮</button>
+      <button class="icon-btn hidden" id="fsBtn" aria-label="Fullscreen" title="Fullscreen">⛶</button>
       <button class="icon-btn" id="soundBtn" aria-label="Toggle sound" title="Sound (M)">🔊</button>
       <button class="icon-btn" id="pauseBtn" aria-label="Pause" title="Pause (P)">⏸</button>
     </div>
@@ -212,7 +258,7 @@
     <div class="stat"><span>Best</span><strong id="best">0</strong></div>
   </section>
 
-  <section>
+  <section class="meters">
     <div class="meter-label"><span>⚡ Energy</span><strong id="energyText">100%</strong></div>
     <div class="bar"><div id="energyFill"></div></div>
     <div class="sub-row">
@@ -410,7 +456,7 @@ function loadSave() {
   try { raw = JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch { raw = {}; }
   const s = {
     bests: raw.bests || {},
-    settings: { mode: 'classic', diff: 'medium', skin: 'emerald', sound: true, ...(raw.settings || {}) },
+    settings: { mode: 'classic', diff: 'medium', skin: 'emerald', sound: true, dpad: false, ...(raw.settings || {}) },
     stats: { games: 0, fruits: 0, bestLength: 0, playMs: 0, secrets: 0, ...(raw.stats || {}) },
     achievements: raw.achievements || {},
     daily: raw.daily || null,
@@ -592,6 +638,7 @@ function startGame(daily = false) {
   gameId++;
   setupGame(daily);
   showScreen(null);
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
   if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
   state = 'countdown';
   countdownMs = COUNT_STEP * 3;
@@ -1015,8 +1062,29 @@ function resize() {
   W = w; DPR = Math.min(window.devicePixelRatio || 1, 3);
   canvas.width = Math.round(W * DPR); canvas.height = Math.round(W * DPR);
   CELL = W / COLS;
+  wrapEl.style.setProperty('--ov-fs', clamp(W / 28, 10.5, 16).toFixed(1) + 'px');
   spriteCache.clear();
   buildBg();
+}
+
+// Size the board to the largest square that fits the screen below the HUD
+// (or beside it when a phone is held sideways), leaving room for the arrow pad if it's on.
+const landscapeMQ = matchMedia('(orientation: landscape) and (max-height: 540px)');
+const coarseMQ = matchMedia('(pointer: coarse)');
+function layout() {
+  const vh = window.innerHeight;
+  const app = wrapEl.parentElement, cs = getComputedStyle(app);
+  let size;
+  if (landscapeMQ.matches) {
+    size = Math.min(vh - 16, window.innerWidth * .62);
+  } else {
+    const contentW = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const top = wrapEl.getBoundingClientRect().top + window.scrollY;
+    const pad = $('dpad');
+    const below = document.body.classList.contains('pad-on') ? pad.offsetHeight + (parseFloat(cs.rowGap) || 8) : 0;
+    size = Math.min(contentW, vh - top - below - 10);
+  }
+  wrapEl.style.width = Math.max(220, Math.floor(size)) + 'px';
 }
 function buildBg() {
   bg.width = canvas.width; bg.height = canvas.height;
@@ -1303,6 +1371,10 @@ function drawCountdown() {
   ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
   ctx.fillStyle = '#cbd5e1';
   ctx.fillText(isDaily ? `📅 Daily #${dailyNumber()} · ${mode.name}` : `${mode.name} · ${diff.name}`, W / 2, W * .68);
+  if (coarseMQ.matches && !document.body.classList.contains('pad-on')) {
+    ctx.fillStyle = '#fde047';
+    ctx.fillText('👆 Swipe on the board to steer', W / 2, W * .76);
+  }
 }
 
 // ================================================================
@@ -1360,6 +1432,7 @@ function updateHud() {
     el.chips.innerHTML = chips.map(([t, c]) => `<span class="chip" style="--c:${c}">${t}</span>`).join('');
   }, sig);
 
+  setStyle('playing', v => document.body.classList.toggle('playing', v), state === 'playing' || state === 'countdown');
   const canPause = state === 'playing' || state === 'countdown' || state === 'paused';
   setStyle('pauseIcon', v => el.pauseBtn.textContent = v, state === 'paused' ? '▶' : '⏸');
   setStyle('pauseDis', v => el.pauseBtn.disabled = v, !canPause);
@@ -1694,9 +1767,52 @@ document.addEventListener('click', e => { const b = e.target.closest('button'); 
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
+// Arrow pad: off by default (swipe is the main touch control), remembered once turned on.
+const padBtn = $('padBtn'), fsBtn = $('fsBtn');
+function applyPad() {
+  const on = !!save.settings.dpad && coarseMQ.matches;
+  document.body.classList.toggle('pad-on', on);
+  padBtn.classList.toggle('on', on);
+  padBtn.setAttribute('aria-pressed', String(on));
+  layout();
+}
+padBtn.addEventListener('click', () => {
+  save.settings.dpad = !save.settings.dpad;
+  persist(); sfx.click();
+  applyPad();
+  toast(save.settings.dpad ? '🎮 Arrow buttons on' : '👆 Arrow buttons off: swipe on the board');
+});
+
+// Fullscreen (Android Chrome, desktop). iPhone Safari doesn't support it, so the button stays hidden there.
+const root = document.documentElement;
+const fsRequest = root.requestFullscreen || root.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+if (fsRequest) fsBtn.classList.remove('hidden');
+fsBtn.addEventListener('click', () => {
+  try {
+    const p = fsElement() ? fsExit.call(document) : fsRequest.call(root, { navigationUI: 'hide' });
+    if (p && p.catch) p.catch(() => {});
+  } catch {}
+});
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(ev, () => {
+    const on = !!fsElement();
+    document.body.classList.toggle('fs', on);
+    fsBtn.classList.toggle('on', on);
+    window.scrollTo(0, 0);
+    requestAnimationFrame(layout);
+  });
+}
+
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 150));
+if (window.visualViewport) visualViewport.addEventListener('resize', layout);
+
 // ================================================================
 // Boot
 // ================================================================
+applyPad();   // also runs layout()
 new ResizeObserver(resize).observe(wrapEl);
 resize();
 setupGame();

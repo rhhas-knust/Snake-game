@@ -22,14 +22,16 @@ A single-file snake game for the browser. It has no dependencies and no build st
 - **5 snake skins**, including an animated rainbow skin.
 - **15 achievements** (2 hidden) and lifetime stats.
 - Smooth, interpolated movement at the display's refresh rate, with particles, screen shake, and sound effects synthesized with WebAudio.
-- Keyboard, swipe, and on-screen D-pad controls, plus a 3-move input buffer so quick turns aren't dropped.
-- Crisp rendering on HiDPI screens, a layout that works on phones, and auto-pause when you switch tabs.
+- Keyboard and swipe controls, plus an optional on-screen arrow pad (🎮 button, off by default) and a 3-move input buffer so quick turns aren't dropped.
+- **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button where the browser supports it, and the page doesn't scroll while you swipe.
+- Crisp rendering on HiDPI screens and auto-pause when you switch tabs.
 
 ## Controls
 
 | Action | Keyboard | Touch |
 | --- | --- | --- |
-| Move | Arrow keys / WASD | Swipe on the board or use the D-pad |
+| Move | Arrow keys / WASD | Swipe on the board (or turn on the 🎮 arrow pad) |
+| Fullscreen | | ⛶ button (Android / desktop) |
 | Pause / resume | P, Space, Esc | ⏸ button |
 | Start / replay | Enter | Buttons |
 | Share score (game-over screen) | S | 📤 Share button |
