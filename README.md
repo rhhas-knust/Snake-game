@@ -16,20 +16,25 @@ A single-file snake game for the browser. It has no dependencies and no build st
 - **Poison** (🥥 🥚): deadly, but each one disappears after a few seconds.
 - **Golden star** 🌟: a rare, short-lived bonus worth 75 points.
 - **Power-ups**: 🛡️ Shield, ⏳ Slow-mo, 💎 Double points, 🧲 Magnet, ✂️ Shrink.
+- **Daily Challenge** 📅: every player in the world gets the same board, fruit order and spawn timing each day (UTC). The mode rotates between Classic, Portal and Maze on Medium difficulty, and your best score and attempts for the day are tracked.
+- **Share score** 📤: the game-over screen builds a 1080×1920 score card (a snapshot of the board, your score and stats, and the game link) that fits TikTok, Instagram Stories and WhatsApp Status. On phones it opens the share sheet. On desktop it downloads the image and copies a caption. To add your TikTok handle to every card, set `CREATOR_HANDLE` in `index.html`.
 - **Secret level** 🌌: see the spoiler below.
 - **5 snake skins**, including an animated rainbow skin.
 - **15 achievements** (2 hidden) and lifetime stats.
 - Smooth, interpolated movement at the display's refresh rate, with particles, screen shake, and sound effects synthesized with WebAudio.
-- Keyboard, swipe, and on-screen D-pad controls, plus a 3-move input buffer so quick turns aren't dropped.
-- Crisp rendering on HiDPI screens, a layout that works on phones, and auto-pause when you switch tabs.
+- Keyboard and swipe controls, plus an optional on-screen arrow pad (🎮 button, off by default) and a 3-move input buffer so quick turns aren't dropped.
+- **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button where the browser supports it, and the page doesn't scroll while you swipe.
+- Crisp rendering on HiDPI screens and auto-pause when you switch tabs.
 
 ## Controls
 
 | Action | Keyboard | Touch |
 | --- | --- | --- |
-| Move | Arrow keys / WASD | Swipe on the board or use the D-pad |
+| Move | Arrow keys / WASD | Swipe on the board (or turn on the 🎮 arrow pad) |
+| Fullscreen | | ⛶ button (Android / desktop) |
 | Pause / resume | P, Space, Esc | ⏸ button |
 | Start / replay | Enter | Buttons |
+| Share score (game-over screen) | S | 📤 Share button |
 | Mute | M | 🔊 button |
 
 <details>
