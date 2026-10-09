@@ -1,0 +1,1520 @@
+(() => {
+'use strict';
+const $ = id => document.getElementById(id);
+
+// ================================================================
+// Data
+// ================================================================
+const COLS = 20, ROWS = 20;
+const FRUITS_PER_LEVEL = 5;
+const COMBO_WINDOW = 3500;   // ms between fruits to keep a combo alive
+const MAX_COMBO = 8;
+const COUNT_STEP = 650;      // ms per countdown number
+
+const MODES = {
+  classic: { name: 'Classic', icon: '🧱', desc: 'Walls are deadly',     wrap: false, maze: false, energy: true,  hazards: true },
+  portal:  { name: 'Portal',  icon: '🌀', desc: 'Edges wrap around',    wrap: true,  maze: false, energy: true,  hazards: true },
+  maze:    { name: 'Maze',    icon: '🪨', desc: 'Rocks grow each level', wrap: false, maze: true,  energy: true,  hazards: true },
+  zen:     { name: 'Zen',     icon: '🧘', desc: 'No energy, no poison', wrap: true,  maze: false, energy: false, hazards: false },
+};
+const DIFFS = {
+  easy:   { name: 'Easy',   step: 210, min: 120, drain: 2.4 },
+  medium: { name: 'Medium', step: 160, min: 90,  drain: 3.2 },
+  hard:   { name: 'Hard',   step: 115, min: 65,  drain: 4.0 },
+  expert: { name: 'Expert', step: 82,  min: 50,  drain: 4.8 },
+};
+const SKINS = {
+  emerald: { name: 'Emerald', head: '#86efac', body: '#22c55e', tail: '#166534' },
+  ocean:   { name: 'Ocean',   head: '#7dd3fc', body: '#0ea5e9', tail: '#1e3a8a' },
+  neon:    { name: 'Neon',    head: '#f5d0fe', body: '#d946ef', tail: '#6b21a8' },
+  sunset:  { name: 'Sunset',  head: '#fde68a', body: '#f97316', tail: '#991b1b' },
+  rainbow: { name: 'Rainbow', head: '#ffffff', body: '#ff0000', tail: '#0000ff', rainbow: true },
+};
+const FRUITS = [
+  { id: 'apple',  emoji: '🍎', name: 'Apple',  score: 10, energy: 15, weight: 30, glow: '#ef4444' },
+  { id: 'banana', emoji: '🍌', name: 'Banana', score: 15, energy: 20, weight: 22, glow: '#facc15' },
+  { id: 'orange', emoji: '🍊', name: 'Orange', score: 8,  energy: 10, weight: 30, glow: '#fb923c' },
+  { id: 'grapes', emoji: '🍇', name: 'Grapes', score: 20, energy: 25, weight: 12, glow: '#a855f7' },
+  { id: 'mango',  emoji: '🥭', name: 'Mango',  score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
+];
+const GOLDEN = { id: 'golden', emoji: '🌟', name: 'Golden Star', score: 75, energy: 40, life: 6000, glow: '#fde047' };
+// Secret level: a hidden portal can open after level 4 and leads to a timed candy stage.
+const PORTAL = { id: 'portal', emoji: '🌀', name: 'Secret Portal', life: 10000, glow: '#a855f7' };
+const SECRET_MS = 20000;
+const SECRET_CANDY_COUNT = 12;
+const CANDIES = [
+  { id: 'candy',    emoji: '🍬', name: 'Candy',    score: 30,  energy: 0, weight: 30, glow: '#f472b6' },
+  { id: 'lolly',    emoji: '🍭', name: 'Lollipop', score: 40,  energy: 0, weight: 24, glow: '#c084fc' },
+  { id: 'donut',    emoji: '🍩', name: 'Donut',    score: 35,  energy: 0, weight: 24, glow: '#fbbf24' },
+  { id: 'cupcake',  emoji: '🧁', name: 'Cupcake',  score: 50,  energy: 0, weight: 14, glow: '#fb7185' },
+  { id: 'crown',    emoji: '👑', name: 'Crown',    score: 200, energy: 0, weight: 2,  glow: '#fde047' },
+];
+const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
+const HAZARDS = [
+  { id: 'coconut', emoji: '🥥', name: 'Coconut',    glow: '#ef4444' },
+  { id: 'egg',     emoji: '🥚', name: 'Boiled Egg', glow: '#ef4444' },
+];
+const POWERS = {
+  shield: { id: 'shield', emoji: '🛡️', name: 'Shield',   color: '#38bdf8', desc: 'Survive one fatal hit' },
+  slow:   { id: 'slow',   emoji: '⏳', name: 'Slow-mo',  color: '#a78bfa', desc: 'Slows the game down', dur: 7000 },
+  double: { id: 'double', emoji: '💎', name: 'x2 Points', color: '#22d3ee', desc: 'Double points', dur: 10000 },
+  magnet: { id: 'magnet', emoji: '🧲', name: 'Magnet',   color: '#f472b6', desc: 'Pulls fruit toward you', dur: 9000 },
+  shrink: { id: 'shrink', emoji: '✂️', name: 'Shrink',   color: '#fbbf24', desc: 'Trims your tail' },
+};
+const ACHIEVEMENTS = [
+  { id: 'first',   icon: '🍎', name: 'First Bite',  desc: 'Eat your first fruit',        test: g => g.fruits >= 1 },
+  { id: 'combo5',  icon: '🔥', name: 'On Fire',     desc: 'Reach a x5 combo',            test: g => g.maxCombo >= 5 },
+  { id: 'combo8',  icon: '☄️', name: 'Unstoppable', desc: 'Reach the max x8 combo',      test: g => g.maxCombo >= 8 },
+  { id: 'len25',   icon: '📏', name: 'Long Boi',    desc: 'Grow to length 25',           test: g => g.length >= 25 },
+  { id: 'len50',   icon: '🐉', name: 'Dragon',      desc: 'Grow to length 50',           test: g => g.length >= 50 },
+  { id: 'lvl5',    icon: '🚀', name: 'Speedster',   desc: 'Reach level 5',               test: g => g.level >= 5 },
+  { id: 'lvl10',   icon: '🏆', name: 'Master',      desc: 'Reach level 10',              test: g => g.level >= 10 },
+  { id: 'golden',  icon: '🌟', name: 'Gold Digger', desc: 'Eat a golden star',           test: g => g.golden >= 1 },
+  { id: 'shield',  icon: '🛡️', name: 'Close Call',  desc: 'Get saved by a shield',       test: g => g.shieldSaved },
+  { id: 's500',    icon: '💯', name: 'High Roller', desc: 'Score 500 in one game',       test: g => g.score >= 500 },
+  { id: 's2000',   icon: '👑', name: 'Legend',      desc: 'Score 2000 in one game',      test: g => g.score >= 2000 },
+  { id: 'expert',  icon: '💀', name: 'Daredevil',   desc: 'Score 300 on Expert',         test: g => g.diff === 'expert' && g.score >= 300 },
+  { id: 'maze',    icon: '🪨', name: 'Rock Solid',  desc: 'Reach level 6 in Maze mode',  test: g => g.mode === 'maze' && g.level >= 6 },
+  { id: 'secret',  icon: '🌌', name: 'Explorer',    desc: 'Find the secret level',       test: g => g.secrets >= 1, hidden: true },
+  { id: 'sugar',   icon: '🍭', name: 'Sugar Rush',  desc: 'Score 500 in one secret level', test: g => g.secretBest >= 500, hidden: true },
+];
+
+const U = { x: 0, y: -1 }, D = { x: 0, y: 1 }, L = { x: -1, y: 0 }, R = { x: 1, y: 0 };
+const DIRS = { up: U, down: D, left: L, right: R };
+
+// ================================================================
+// Persistence (localStorage can throw in private mode / sandboxes)
+// ================================================================
+const SAVE_KEY = 'snakepro_v2';
+// Saved data is untrusted: every GitHub Pages project on the same account shares this
+// origin's storage, so anything read back is coerced to the exact shape and types we expect
+// before it can reach the page.
+const num = v => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0; };
+const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+function loadSave() {
+  let raw = {};
+  try { raw = obj(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch { raw = {}; }
+  const rs = obj(raw.settings), rt = obj(raw.stats), rd = obj(raw.daily);
+  const bests = {};
+  for (const [k, v] of Object.entries(obj(raw.bests))) {
+    const [m, d] = k.split(':');
+    if (MODES[m] && DIFFS[d]) bests[k] = num(v);
+  }
+  const achievements = {};
+  for (const a of ACHIEVEMENTS) if (obj(raw.achievements)[a.id]) achievements[a.id] = num(raw.achievements[a.id]) || 1;
+  const s = {
+    bests,
+    settings: {
+      mode: MODES[rs.mode] ? rs.mode : 'classic',
+      diff: DIFFS[rs.diff] ? rs.diff : 'medium',
+      skin: SKINS[rs.skin] ? rs.skin : 'emerald',
+      sound: rs.sound !== false,
+      dpad: rs.dpad === true,
+    },
+    stats: { games: num(rt.games), fruits: num(rt.fruits), bestLength: num(rt.bestLength), playMs: num(rt.playMs), secrets: num(rt.secrets) },
+    achievements,
+    daily: /^\d{4}-\d{2}-\d{2}$/.test(rd.date) ? { date: rd.date, best: num(rd.best), attempts: num(rd.attempts) } : null,
+  };
+  // Carry over the high score from the original version of the game.
+  try {
+    const old = parseInt(localStorage.getItem('snake_high_score'), 10);
+    if (old > (s.bests['classic:medium'] || 0)) s.bests['classic:medium'] = old;
+  } catch {}
+  return s;
+}
+const save = loadSave();
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+const menuBestKey = () => `${save.settings.mode}:${save.settings.diff}`;
+
+// ---------- Daily Challenge ----------
+// Everyone in the world gets the same board, fruit order and spawn timings each UTC day.
+const DAILY_EPOCH = Date.UTC(2026, 8, 28);          // Daily #1
+const DAILY_MODES = ['classic', 'portal', 'maze'];
+const DAILY_DIFF = 'medium';
+const todayKey = () => new Date().toISOString().slice(0, 10);
+const dailyNumber = () => Math.floor((Date.parse(todayKey()) - DAILY_EPOCH) / 864e5) + 1;
+const dailyModeId = () => DAILY_MODES[((dailyNumber() % 3) + 3) % 3];
+function dailyState() {
+  if (!save.daily || save.daily.date !== todayKey()) save.daily = { date: todayKey(), best: 0, attempts: 0 };
+  return save.daily;
+}
+
+// ---------- Sharing ----------
+const GAME_URL = /^https?:/.test(location.protocol) ? location.origin + location.pathname : 'https://rhhas-knust.github.io/Snake-game/';
+const SHARE_URL_LABEL = GAME_URL.replace(/^https?:\/\//, '').replace(/\/$/, '');
+const CREATOR_HANDLE = '@roberthasford';   // TikTok handle printed on share cards
+
+// ================================================================
+// Audio (tiny WebAudio synth, no files needed)
+// ================================================================
+const audio = { ctx: null, master: null };
+function ac() {
+  if (!save.settings.sound) return null;
+  if (!audio.ctx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    audio.ctx = new AC();
+    audio.master = audio.ctx.createGain();
+    audio.master.gain.value = 0.22;
+    audio.master.connect(audio.ctx.destination);
+  }
+  if (audio.ctx.state === 'suspended') audio.ctx.resume();
+  return audio.ctx;
+}
+function tone(freq, dur = 0.1, type = 'sine', vol = 0.5, delay = 0, slide = 0) {
+  const c = ac(); if (!c) return;
+  const t = c.currentTime + delay;
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (slide) o.frequency.exponentialRampToValueAtTime(slide, t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(audio.master);
+  o.start(t); o.stop(t + dur + 0.03);
+}
+const sfx = {
+  eat(c)     { const b = 520 * Math.pow(1.07, c - 1); tone(b, .07, 'square', .25); tone(b * 1.5, .09, 'square', .2, .05); },
+  golden()   { [784, 988, 1175, 1568].forEach((f, i) => tone(f, .12, 'triangle', .35, i * .06)); },
+  power()    { [440, 660, 880].forEach((f, i) => tone(f, .1, 'sine', .4, i * .05)); },
+  level()    { [523, 659, 784, 1047].forEach((f, i) => tone(f, .14, 'triangle', .4, i * .08)); },
+  shield()   { tone(300, .25, 'sawtooth', .3, 0, 120); tone(900, .15, 'sine', .3, .05, 1400); },
+  die()      { tone(400, .5, 'sawtooth', .35, 0, 60); tone(200, .6, 'square', .2, .05, 40); },
+  count(go)  { tone(go ? 880 : 440, go ? .2 : .1, 'sine', .4); },
+  achieve()  { [660, 880, 1320].forEach((f, i) => tone(f, .12, 'sine', .3, .15 + i * .07)); },
+  click()    { tone(700, .04, 'sine', .15); },
+  secret()   { [392, 523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, .18, 'triangle', .3, i * .07)); tone(110, .9, 'sine', .3, 0, 440); },
+  portal()   { tone(330, .6, 'sine', .25, 0, 990); },
+  poof()     { tone(220, .12, 'triangle', .15, 0, 110); },
+};
+const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ================================================================
+// Helpers
+// ================================================================
+// Gameplay randomness goes through rng() so the Daily Challenge can be seeded.
+// Purely visual randomness (particles, stars) uses frand() and never touches the seed.
+let rng = Math.random;
+function mulberry32(seed) {
+  return () => {
+    seed = (seed + 0x6D2B79F5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hashString(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+const rand = (a, b) => a + rng() * (b - a);
+const randInt = n => Math.floor(rng() * n);
+const frand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const cellKey = (x, y) => x + ',' + y;
+const easeOutBack = t => 1 + 2.7 * Math.pow(t - 1, 3) + 1.7 * Math.pow(t - 1, 2);
+function hexRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+function rgba(h, a) { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b},${a})`; }
+function mixHex(a, b, t) {
+  const A = hexRgb(a), B = hexRgb(b);
+  return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
+}
+function pickWeighted(list) {
+  let r = rng() * list.reduce((s, f) => s + f.weight, 0);
+  for (const f of list) if ((r -= f.weight) < 0) return f;
+  return list[0];
+}
+function fmtTime(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
+function rr(c, x, y, w, h, r) {
+  r = Math.min(r, w / 2, h / 2);
+  c.beginPath(); c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+// ================================================================
+// Game state
+// ================================================================
+let state = 'menu';          // menu | countdown | playing | paused | over
+let resumeState = 'playing';
+let mode, diff, skin, modeId, diffId;
+let snake, prevSnake, dir, queue, items, obstacles, obstacleList;
+let score, best, energy, level, fruitsEaten, combo, lastEatAt, maxCombo;
+let gameTime, acc, tickCount, countdownMs, effects, shield, ghostUntil;
+let nextHazardAt, nextPowerAt, nextGoldenAt, powerCount, goldenCount, shieldSaved;
+let deathReason, isWin, newBest, gameId = 0;
+let isDaily = false, shareBlob = null;
+let secret = null, portalSpawned = false, secretsFound = 0, secretBest = 0, konamiBoost = false, konamiPos = 0;
+let shake = 0, flash = 0, banner = null;
+const particles = [], floaters = [];
+
+function setupGame(daily = false) {
+  isDaily = daily;
+  if (daily) {
+    modeId = dailyModeId(); diffId = DAILY_DIFF;
+    rng = mulberry32(hashString('snakepro-daily-' + todayKey()));
+  } else {
+    modeId = save.settings.mode; diffId = save.settings.diff;
+    rng = Math.random;
+  }
+  mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
+  snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
+  prevSnake = snake.map(s => ({ ...s }));
+  dir = R; queue = [];
+  obstacles = new Set(); obstacleList = [];
+  if (mode.maze) buildMaze();
+  items = [];
+  score = 0; energy = 100; level = 1; fruitsEaten = 0;
+  combo = 0; lastEatAt = -1e9; maxCombo = 0;
+  gameTime = 0; acc = 0; tickCount = 0;
+  effects = { slow: 0, double: 0, magnet: 0 };
+  shield = false; ghostUntil = 0; shieldSaved = false;
+  powerCount = 0; goldenCount = 0;
+  deathReason = ''; isWin = false; newBest = false;
+  particles.length = 0; floaters.length = 0; shake = 0; flash = 0; banner = null;
+  secret = null; portalSpawned = false; secretsFound = 0; secretBest = 0;
+  best = daily ? dailyState().best : (save.bests[menuBestKey()] || 0);
+  shareBlob = null;
+  spawnFruit();
+  scheduleHazard();
+  nextPowerAt = rand(9000, 15000);
+  nextGoldenAt = rand(15000, 25000);
+  wrapEl.dataset.mode = modeId;
+}
+
+function startGame(daily = false) {
+  gameId++;
+  setupGame(daily);
+  showScreen(null);
+  if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  state = 'countdown';
+  countdownMs = COUNT_STEP * 3;
+  sfx.count(false);
+}
+
+function buildMaze() {
+  const add = (x, y) => addRock(x, y, 0);
+  for (let x = 3; x <= 7; x++) { add(x, 4); add(x, 15); }
+  for (let x = 12; x <= 16; x++) { add(x, 4); add(x, 15); }
+  for (let y = 5; y <= 7; y++) { add(3, y); add(16, y); }
+  for (let y = 12; y <= 14; y++) { add(3, y); add(16, y); }
+}
+function addRock(x, y, born) {
+  const k = cellKey(x, y);
+  if (obstacles.has(k)) return;
+  obstacles.add(k); obstacleList.push({ x, y, born });
+}
+
+function currentStep() {
+  let s = Math.max(diff.min, diff.step * Math.pow(0.94, level - 1));
+  if (effects.slow > gameTime) s *= 1.6;
+  return s;
+}
+
+// ---------- Spawning ----------
+function isFree(x, y, snakeSet) {
+  if (obstacles.has(cellKey(x, y))) return false;
+  if (snakeSet.has(cellKey(x, y))) return false;
+  return !items.some(i => i.x === x && i.y === y);
+}
+function randomFree(avoidHead = 0) {
+  const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
+  const h = snake[0];
+  const cells = [], fallback = [];
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if (!isFree(x, y, snakeSet)) continue;
+    fallback.push({ x, y });
+    if (Math.abs(x - h.x) + Math.abs(y - h.y) >= avoidHead) cells.push({ x, y });
+  }
+  const pool = cells.length ? cells : fallback;
+  return pool.length ? pool[randInt(pool.length)] : null;
+}
+function spawnFruit() {
+  const c = randomFree(2);
+  if (!c) return false;
+  items.push({ ...c, kind: 'fruit', type: pickWeighted(FRUITS), born: gameTime });
+  return true;
+}
+function spawnGolden() {
+  const c = randomFree(4);
+  if (!c) return;
+  items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
+  floater(c.x + .5, c.y - .2, 'Golden!', GOLDEN.glow, .45);
+}
+function spawnHazard() {
+  const max = Math.min(4, 1 + Math.floor(level / 3));
+  if (items.filter(i => i.kind === 'hazard').length >= max) return;
+  const c = randomFree(5);
+  if (!c) return;
+  const life = rand(6000, 9000);
+  items.push({ ...c, kind: 'hazard', type: HAZARDS[randInt(HAZARDS.length)], born: gameTime, expires: gameTime + life, life });
+}
+function scheduleHazard() {
+  nextHazardAt = gameTime + rand(5000, 10000) * Math.max(0.45, 1 - level * 0.05);
+}
+function spawnPower() {
+  if (items.some(i => i.kind === 'power')) return;
+  const pool = [
+    { p: POWERS.shield, weight: shield ? 0 : 3 },
+    { p: POWERS.slow,   weight: 2 },
+    { p: POWERS.double, weight: 3 },
+    { p: POWERS.magnet, weight: 2 },
+    { p: POWERS.shrink, weight: snake.length > 10 ? 2 : 0 },
+  ].filter(o => o.weight > 0);
+  const c = randomFree(4);
+  if (!c) return;
+  const life = 8000;
+  items.push({ ...c, kind: 'power', type: pickWeighted(pool).p, born: gameTime, expires: gameTime + life, life });
+}
+
+// ---------- Core update ----------
+const isGhost = () => gameTime < ghostUntil;
+
+function tick() {
+  tickCount++;
+  prevSnake = snake.map(s => ({ x: s.x, y: s.y }));
+  if (queue.length) dir = queue.shift();
+
+  let nx = snake[0].x + dir.x, ny = snake[0].y + dir.y;
+  if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) {
+    if (mode.wrap || secret || isGhost() || useShield()) { nx = (nx + COLS) % COLS; ny = (ny + ROWS) % ROWS; }
+    else return die('You hit the wall');
+  }
+
+  const item = items.find(i => i.x === nx && i.y === ny);
+  const grows = !!item && (item.kind === 'fruit' || item.kind === 'golden');
+  // The tail moves out of the way this tick unless we're growing.
+  const body = grows ? snake : snake.slice(0, -1);
+  const hitSelf = body.some(s => s.x === nx && s.y === ny);
+  const hitRock = obstacles.has(cellKey(nx, ny));
+  if ((hitSelf || hitRock) && !isGhost() && !useShield()) {
+    return die(hitRock ? 'You crashed into a rock' : 'You bit your own tail');
+  }
+
+  snake.unshift({ x: nx, y: ny });
+  if (!grows) snake.pop();
+  if (item) consume(item);
+  if (state === 'playing' && effects.magnet > gameTime && tickCount % 2 === 0) magnetPull();
+}
+
+function consume(item) {
+  items.splice(items.indexOf(item), 1);
+  const cx = item.x + .5, cy = item.y + .5, t = item.type;
+
+  if (item.kind === 'fruit' || item.kind === 'golden') {
+    combo = (gameTime - lastEatAt <= COMBO_WINDOW) ? Math.min(combo + 1, MAX_COMBO) : 1;
+    lastEatAt = gameTime;
+    maxCombo = Math.max(maxCombo, combo);
+    const mult = combo * (effects.double > gameTime ? 2 : 1);
+    const pts = t.score * mult;
+    score += pts;
+    energy = Math.min(100, energy + t.energy);
+    burst(cx, cy, t.glow, item.kind === 'golden' ? 30 : 14, item.kind === 'golden' ? 6 : 4);
+    floater(cx, cy - .2, '+' + pts, mult > 1 ? '#fde047' : '#ffffff', .5);
+    if (combo >= 2) floater(cx, cy - .9, `COMBO x${combo}`, '#fb923c', .38);
+    if (item.kind === 'golden') {
+      goldenCount++; sfx.golden(); shake = Math.max(shake, 4);
+    } else {
+      sfx.eat(combo);
+      fruitsEaten++;
+      if (!spawnFruit()) return die('You filled the whole board!', true);
+      if (fruitsEaten % FRUITS_PER_LEVEL === 0) levelUp();
+    }
+  } else if (item.kind === 'hazard') {
+    if (isGhost()) {
+      burst(cx, cy, '#94a3b8', 10); floater(cx, cy - .2, 'Blocked!', '#94a3b8', .4); sfx.poof();
+    } else if (!useShield()) {
+      return die(`You ate a poisonous ${t.name.toLowerCase()} ${t.emoji}`);
+    }
+  } else if (item.kind === 'power') {
+    applyPower(t, cx, cy);
+  } else if (item.kind === 'candy') {
+    combo = (gameTime - lastEatAt <= COMBO_WINDOW) ? Math.min(combo + 1, MAX_COMBO) : 1;
+    lastEatAt = gameTime;
+    maxCombo = Math.max(maxCombo, combo);
+    const pts = t.score * combo * (effects.double > gameTime ? 2 : 1);
+    score += pts;
+    if (secret) secret.points += pts;
+    burst(cx, cy, t.glow, t.id === 'crown' ? 30 : 12, 4);
+    floater(cx, cy - .2, '+' + pts, t.id === 'crown' ? '#fde047' : '#f5d0fe', .5);
+    if (t.id === 'crown') sfx.golden(); else sfx.eat(combo);
+    if (secret) spawnCandy();
+  } else if (item.kind === 'portal') {
+    enterSecret();
+  }
+  checkAchievements();
+}
+
+// ---------- Secret level ----------
+function spawnPortal() {
+  const c = randomFree(4);
+  if (!c) return;
+  portalSpawned = true;
+  if (!isDaily) konamiBoost = false;
+  items.push({ ...c, kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life });
+  floater(c.x + .5, c.y - .2, '???', PORTAL.glow, .5);
+  sfx.portal();
+}
+function spawnCandy() {
+  const c = randomFree(2);
+  if (c) items.push({ ...c, kind: 'candy', type: pickWeighted(CANDIES), born: gameTime });
+}
+function enterSecret() {
+  secret = { until: gameTime + SECRET_MS, rocks: obstacleList, points: 0 };
+  secretsFound++;
+  save.stats.secrets = (save.stats.secrets || 0) + 1;
+  obstacles = new Set(); obstacleList = [];
+  items = [];
+  energy = 100;
+  for (let i = 0; i < SECRET_CANDY_COUNT; i++) spawnCandy();
+  const h = snake[0];
+  burst(h.x + .5, h.y + .5, PORTAL.glow, 40, 8);
+  shake = Math.max(shake, 8);
+  banner = { text: 'SECRET LEVEL', sub: `Candy rush! ${SECRET_MS / 1000} seconds`, t: 0, dur: 1800 };
+  sfx.secret(); vibrate(80);
+  wrapEl.dataset.mode = 'secret';
+}
+function exitSecret() {
+  const s = secret;
+  secret = null;
+  secretBest = Math.max(secretBest, s.points);
+  items = [];
+  // Bring the rocks back, except any that would land on the snake.
+  const snakeSet = new Set(snake.map(p => cellKey(p.x, p.y)));
+  obstacles = new Set(); obstacleList = [];
+  for (const r of s.rocks) if (!snakeSet.has(cellKey(r.x, r.y))) addRock(r.x, r.y, gameTime);
+  ghostUntil = gameTime + 2000;   // grace period to find your bearings
+  spawnFruit();
+  scheduleHazard();
+  nextPowerAt = gameTime + rand(6000, 12000);
+  nextGoldenAt = gameTime + rand(15000, 25000);
+  banner = { text: 'WELCOME BACK', sub: `+${s.points} secret points`, t: 0, dur: 1800 };
+  sfx.portal();
+  wrapEl.dataset.mode = modeId;
+  checkAchievements();
+  persist();
+}
+
+function applyPower(p, cx, cy) {
+  powerCount++;
+  sfx.power();
+  burst(cx, cy, p.color, 18, 5);
+  floater(cx, cy - .2, p.name, p.color, .42);
+  if (p.id === 'shield') shield = true;
+  else if (p.dur) effects[p.id] = gameTime + p.dur;
+  else if (p.id === 'shrink') {
+    const cut = Math.min(4, snake.length - 3);
+    for (let i = 0; i < cut; i++) {
+      const s = snake.pop();
+      burst(s.x + .5, s.y + .5, skin.rainbow ? '#ffffff' : skin.body, 5, 3);
+    }
+    energy = Math.min(100, energy + 10);
+  }
+}
+
+function useShield() {
+  if (!shield) return false;
+  shield = false; shieldSaved = true;
+  ghostUntil = gameTime + 1500;
+  const h = snake[0];
+  burst(h.x + .5, h.y + .5, POWERS.shield.color, 24, 6);
+  floater(h.x + .5, h.y - .3, 'SHIELD!', POWERS.shield.color, .5);
+  shake = Math.max(shake, 7); flash = .5;
+  sfx.shield(); vibrate(60);
+  return true;
+}
+
+function magnetPull() {
+  const h = snake[0];
+  const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
+  for (const it of items) {
+    if (it.kind !== 'fruit' && it.kind !== 'golden' && it.kind !== 'candy') continue;
+    const dx = h.x - it.x, dy = h.y - it.y;
+    if (Math.abs(dx) + Math.abs(dy) <= 1) continue;
+    const moves = Math.abs(dx) >= Math.abs(dy)
+      ? [[Math.sign(dx), 0], [0, Math.sign(dy)]]
+      : [[0, Math.sign(dy)], [Math.sign(dx), 0]];
+    for (const [mx, my] of moves) {
+      if (!mx && !my) continue;
+      const nx = it.x + mx, ny = it.y + my;
+      if (nx < 0 || ny < 0 || nx >= COLS || ny >= ROWS || !isFree(nx, ny, snakeSet)) continue;
+      it.fromX = it.x; it.fromY = it.y; it.movedAt = gameTime;
+      it.x = nx; it.y = ny;
+      break;
+    }
+  }
+}
+
+function levelUp() {
+  level++;
+  sfx.level();
+  let sub = 'Speed up!';
+  if (mode.maze) {
+    for (let i = 0; i < 3; i++) {
+      const c = randomFree(5);
+      if (c) addRock(c.x, c.y, gameTime);
+    }
+    sub = 'New rocks appeared!';
+  }
+  banner = { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
+  // The portal opens at most once per game: 40% chance from level 4, guaranteed at level 6.
+  // The cheat code is ignored in the Daily Challenge so it stays fair for everyone.
+  const boost = konamiBoost && !isDaily;
+  const portalLevel = boost ? 2 : 4;
+  if (!portalSpawned && level >= portalLevel && (boost || level >= 6 || rng() < .4)) spawnPortal();
+  checkAchievements();
+}
+
+function die(reason, win = false) {
+  state = 'over';
+  acc = 0; queue = [];
+  prevSnake = snake.map(s => ({ ...s }));
+  deathReason = reason; isWin = win;
+  if (secret) secretBest = Math.max(secretBest, secret.points);
+  const h = snake[0];
+  if (win) {
+    sfx.level();
+    for (let i = 0; i < 6; i++) burst(frand(2, COLS - 2), frand(2, ROWS - 2), ['#fde047', '#4ade80', '#38bdf8', '#f472b6'][i % 4], 24, 6);
+  } else {
+    sfx.die(); vibrate(160);
+    shake = reduceMotion ? 0 : 16; flash = 1;
+    burst(h.x + .5, h.y + .5, '#ef4444', 30, 7);
+    snake.forEach((s, i) => { if (i % 2 === 0) burst(s.x + .5, s.y + .5, '#94a3b8', 3, 2); });
+  }
+  if (isDaily) {
+    const d = dailyState();
+    d.attempts++;
+    newBest = score > d.best;
+    if (newBest) d.best = score;
+  } else {
+    newBest = score > (save.bests[menuBestKey()] || 0);
+    if (newBest) save.bests[menuBestKey()] = score;
+  }
+  save.stats.games++;
+  save.stats.fruits += fruitsEaten;
+  save.stats.bestLength = Math.max(save.stats.bestLength, snake.length);
+  save.stats.playMs += gameTime;
+  checkAchievements();
+  persist();
+  const token = gameId;
+  setTimeout(() => { if (token === gameId && state === 'over') showOver(); }, win ? 700 : 950);
+}
+
+function update(dt) {
+  // Visual effects keep animating in every state.
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx * dt / 1000; p.y += p.vy * dt / 1000;
+    const f = Math.pow(0.02, dt / 1000);
+    p.vx *= f; p.vy *= f;
+    p.life -= dt * p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  for (let i = floaters.length - 1; i >= 0; i--) {
+    const f = floaters[i];
+    f.y -= dt / 1000 * 1.1; f.life -= dt / 950;
+    if (f.life <= 0) floaters.splice(i, 1);
+  }
+  if (banner) { banner.t += dt; if (banner.t >= banner.dur) banner = null; }
+  shake = Math.max(0, shake - dt * 0.035);
+  flash = Math.max(0, flash - dt / 500);
+
+  if (state === 'countdown') {
+    const before = Math.ceil(countdownMs / COUNT_STEP);
+    countdownMs -= dt;
+    const after = Math.ceil(countdownMs / COUNT_STEP);
+    if (countdownMs <= 0) {
+      state = 'playing';
+      banner = { text: 'GO!', sub: '', t: 0, dur: 700 };
+      sfx.count(true);
+    } else if (after !== before) sfx.count(false);
+    return;
+  }
+  if (state !== 'playing') return;
+
+  gameTime += dt;
+  acc += dt;
+  let step = currentStep(), guard = 0;
+  while (acc >= step && state === 'playing' && guard++ < 4) {
+    acc -= step;
+    tick();
+    step = currentStep();
+  }
+  if (state !== 'playing') return;
+
+  if (secret) {
+    if (gameTime >= secret.until) exitSecret();
+    if (combo > 0 && gameTime - lastEatAt > COMBO_WINDOW) combo = 0;
+    return;   // no energy drain, poison or power-ups inside the secret level
+  }
+  if (mode.energy) {
+    energy -= diff.drain * (1 + 0.05 * (level - 1)) * dt / 1000;
+    if (energy <= 0) { energy = 0; return die('You ran out of energy'); }
+  }
+  for (let i = items.length - 1; i >= 0; i--) {
+    const it = items[i];
+    if (it.expires && gameTime >= it.expires) {
+      items.splice(i, 1);
+      burst(it.x + .5, it.y + .5, '#64748b', 8, 2.5);
+    }
+  }
+  if (mode.hazards && gameTime >= nextHazardAt) { spawnHazard(); scheduleHazard(); }
+  if (gameTime >= nextPowerAt) { spawnPower(); nextPowerAt = gameTime + rand(11000, 18000); }
+  if (gameTime >= nextGoldenAt) {
+    if (!items.some(i => i.kind === 'golden')) spawnGolden();
+    nextGoldenAt = gameTime + rand(20000, 32000);
+  }
+  if (combo > 0 && gameTime - lastEatAt > COMBO_WINDOW) combo = 0;
+}
+
+// ---------- Effects ----------
+function burst(cx, cy, color, n = 12, speed = 4) {
+  if (particles.length > 500) return;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = (0.3 + Math.random()) * speed;
+    particles.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1,
+      decay: 1 / frand(350, 750), size: frand(.05, .14), color });
+  }
+}
+function floater(x, y, text, color, size = .45) {
+  floaters.push({ x, y, text, color, size, life: 1 });
+}
+
+// ---------- Achievements ----------
+function checkAchievements() {
+  const g = { fruits: fruitsEaten, maxCombo, length: snake.length, level, golden: goldenCount,
+    shieldSaved, score, diff: diffId, mode: modeId, secrets: secretsFound,
+    secretBest: Math.max(secretBest, secret ? secret.points : 0) };
+  for (const a of ACHIEVEMENTS) {
+    if (save.achievements[a.id] || !a.test(g)) continue;
+    save.achievements[a.id] = Date.now();
+    toast(`${a.icon} Achievement: ${a.name}`);
+    sfx.achieve();
+    persist();
+  }
+}
+
+// ================================================================
+// Rendering
+// ================================================================
+const canvas = $('board'), ctx = canvas.getContext('2d');
+const wrapEl = $('boardWrap');
+const bg = document.createElement('canvas');
+const spriteCache = new Map();
+let W = 0, CELL = 0, DPR = 1;
+
+function resize() {
+  const w = wrapEl.clientWidth;
+  if (!w) return;
+  W = w; DPR = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(W * DPR); canvas.height = Math.round(W * DPR);
+  CELL = W / COLS;
+  wrapEl.style.setProperty('--ov-fs', clamp(W / 28, 10.5, 16).toFixed(1) + 'px');
+  spriteCache.clear();
+  buildBg();
+}
+
+// Size the board to the largest square that fits the screen below the HUD
+// (or beside it when a phone is held sideways), leaving room for the arrow pad if it's on.
+const landscapeMQ = matchMedia('(orientation: landscape) and (max-height: 540px)');
+const coarseMQ = matchMedia('(pointer: coarse)');
+function layout() {
+  const vh = window.innerHeight;
+  const app = wrapEl.parentElement, cs = getComputedStyle(app);
+  let size;
+  if (landscapeMQ.matches) {
+    size = Math.min(vh - 16, window.innerWidth * .62);
+  } else {
+    const contentW = app.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const top = wrapEl.getBoundingClientRect().top + window.scrollY;
+    const pad = $('dpad');
+    const below = document.body.classList.contains('pad-on') ? pad.offsetHeight + (parseFloat(cs.rowGap) || 8) : 0;
+    size = Math.min(contentW, vh - top - below - 10);
+  }
+  wrapEl.style.width = Math.max(220, Math.floor(size)) + 'px';
+}
+function buildBg() {
+  bg.width = canvas.width; bg.height = canvas.height;
+  const c = bg.getContext('2d'), w = bg.width, cs = w / COLS;
+  c.fillStyle = '#070d1f'; c.fillRect(0, 0, w, w);
+  c.fillStyle = '#0a1328';
+  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
+    if ((x + y) % 2) c.fillRect(Math.floor(x * cs), Math.floor(y * cs), Math.ceil(cs), Math.ceil(cs));
+  }
+  const v = c.createRadialGradient(w / 2, w / 2, w * .25, w / 2, w / 2, w * .75);
+  v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.35)');
+  c.fillStyle = v; c.fillRect(0, 0, w, w);
+}
+function emojiSprite(e) {
+  let s = spriteCache.get(e);
+  if (s) return s;
+  const px = Math.max(8, Math.ceil(CELL * DPR * 1.2));
+  s = document.createElement('canvas'); s.width = s.height = px;
+  const c = s.getContext('2d');
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.font = `${Math.floor(px * .78)}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  c.fillText(e, px / 2, px / 2 + px * .05);
+  spriteCache.set(e, s);
+  return s;
+}
+function rockSprite() {
+  let s = spriteCache.get('#rock');
+  if (s) return s;
+  const px = Math.max(8, Math.ceil(CELL * DPR));
+  s = document.createElement('canvas'); s.width = s.height = px;
+  const c = s.getContext('2d'), p = px * .06;
+  const g = c.createLinearGradient(0, 0, px, px);
+  g.addColorStop(0, '#6b7a90'); g.addColorStop(1, '#2b3647');
+  c.fillStyle = g; rr(c, p, p, px - 2 * p, px - 2 * p, px * .24); c.fill();
+  c.lineWidth = Math.max(1, px * .05); c.strokeStyle = 'rgba(2,6,23,.55)'; c.stroke();
+  c.fillStyle = 'rgba(255,255,255,.2)'; rr(c, px * .2, px * .16, px * .34, px * .13, px * .06); c.fill();
+  c.fillStyle = 'rgba(2,6,23,.25)'; c.beginPath(); c.arc(px * .66, px * .66, px * .09, 0, Math.PI * 2); c.fill();
+  spriteCache.set('#rock', s);
+  return s;
+}
+
+function snakeColor(i, n, now) {
+  const t = n > 1 ? i / (n - 1) : 0;
+  if (skin.rainbow) return `hsl(${(((i * 14 - now * .08) % 360) + 360) % 360},85%,${60 - t * 12}%)`;
+  return mixHex(skin.body, skin.tail, t);
+}
+
+function render(now) {
+  if (!W) return;
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.fillStyle = '#070d1f'; ctx.fillRect(0, 0, W, W);
+  if (shake > 0.2) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  if (secret) drawStarfield(now); else ctx.drawImage(bg, 0, 0, W, W);
+
+  drawRocks();
+  drawItems(now);
+  drawSnake(now);
+  drawParticles();
+  drawFloaters();
+
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  if (flash > 0) { ctx.fillStyle = `rgba(239,68,68,${flash * .28})`; ctx.fillRect(0, 0, W, W); }
+  if (effects && effects.slow > gameTime && state !== 'menu') {
+    ctx.fillStyle = 'rgba(167,139,250,.07)'; ctx.fillRect(0, 0, W, W);
+  }
+  drawBanner();
+  if (state === 'countdown') drawCountdown();
+}
+
+const STARS = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: frand(.4, 1.6), p: frand(0, 6.28), s: frand(.6, 2) }));
+function drawStarfield(now) {
+  const g = ctx.createRadialGradient(W / 2, W / 2, 0, W / 2, W / 2, W * .75);
+  g.addColorStop(0, '#2e1065'); g.addColorStop(1, '#0b0620');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, W);
+  for (const s of STARS) {
+    ctx.globalAlpha = .35 + .65 * Math.abs(Math.sin(now / 700 * s.s + s.p));
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(((s.x + now / 90000 * s.s) % 1) * W, s.y * W, s.r, 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  // Countdown ring around the board edge.
+  const left = clamp((secret.until - gameTime) / SECRET_MS, 0, 1);
+  ctx.fillStyle = left < .25 && Math.floor(now / 200) % 2 ? '#f43f5e' : '#c084fc';
+  ctx.fillRect(0, 0, W * left, Math.max(3, CELL * .12));
+}
+
+function drawRocks() {
+  const sp = rockSprite();
+  for (const r of obstacleList) {
+    const s = r.born ? easeOutBack(clamp((gameTime - r.born) / 350, 0, 1)) : 1;
+    const size = CELL * s;
+    ctx.drawImage(sp, (r.x + .5) * CELL - size / 2, (r.y + .5) * CELL - size / 2, size, size);
+  }
+}
+
+function drawItems(now) {
+  for (const it of items) {
+    let ix = it.x, iy = it.y;
+    if (it.movedAt != null && gameTime - it.movedAt < 120) {
+      const k = (gameTime - it.movedAt) / 120;
+      ix = it.fromX + (it.x - it.fromX) * k; iy = it.fromY + (it.y - it.fromY) * k;
+    }
+    const cx = (ix + .5) * CELL, cy = (iy + .5) * CELL;
+    const age = gameTime - it.born;
+    const sc = easeOutBack(clamp(age / 300, 0, 1));
+    const bob = Math.sin(now / 280 + it.x * 1.3 + it.y) * CELL * .05;
+    const glow = it.kind === 'power' ? it.type.color : it.type.glow;
+    const pulse = it.kind === 'hazard' ? .55 + .25 * Math.sin(now / 120) : .4;
+
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, CELL * .95);
+    g.addColorStop(0, rgba(glow, pulse * .8)); g.addColorStop(1, rgba(glow, 0));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, CELL * .95, 0, Math.PI * 2); ctx.fill();
+
+    if (it.expires) {
+      const left = clamp((it.expires - gameTime) / it.life, 0, 1);
+      ctx.strokeStyle = rgba(glow, .9); ctx.lineWidth = Math.max(1.5, CELL * .07); ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.arc(cx, cy, CELL * .56, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * left); ctx.stroke();
+      // Blink during the last 1.5 seconds.
+      if (it.expires - gameTime < 1500 && Math.floor(now / 110) % 2) continue;
+    }
+    if (it.kind === 'golden') {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(now / 600);
+      ctx.strokeStyle = 'rgba(253,224,71,.5)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) { ctx.rotate(Math.PI / 4); ctx.beginPath(); ctx.moveTo(CELL * .45, 0); ctx.lineTo(CELL * .72, 0); ctx.stroke(); }
+      ctx.restore();
+    }
+    const size = CELL * .95 * sc;
+    if (it.kind === 'portal') {
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(-now / 250);
+      const ps = size * (1.1 + .1 * Math.sin(now / 150));
+      ctx.drawImage(emojiSprite(it.type.emoji), -ps / 2, -ps / 2, ps, ps);
+      ctx.restore();
+      continue;
+    }
+    ctx.drawImage(emojiSprite(it.type.emoji), cx - size / 2, cy - size / 2 + bob, size, size);
+  }
+}
+
+function drawSnake(now) {
+  if (!snake) return;
+  const step = currentStep();
+  const alpha = clamp(acc / step, 0, 1);
+  const n = snake.length;
+  const pts = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const c = snake[i], p = prevSnake[i] || c;
+    const jump = Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1;   // wrapped through an edge
+    const x = jump ? c.x : p.x + (c.x - p.x) * alpha;
+    const y = jump ? c.y : p.y + (c.y - p.y) * alpha;
+    pts[i] = { x: (x + .5) * CELL, y: (y + .5) * CELL };
+  }
+  const width = i => CELL * (.8 - .3 * (n > 1 ? i / (n - 1) : 0));
+  const linked = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < CELL * 1.5;
+  const ghost = isGhost() && state !== 'over';
+  ctx.globalAlpha = ghost ? .5 + .3 * Math.sin(now / 55) : 1;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  // Outline pass, then colour pass (tail first so the head sits on top).
+  ctx.strokeStyle = 'rgba(0,0,0,.4)';
+  for (let i = n - 1; i > 0; i--) {
+    if (!linked(pts[i], pts[i - 1])) continue;
+    ctx.lineWidth = width(i) + CELL * .12;
+    ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); ctx.stroke();
+  }
+  for (let i = n - 1; i > 0; i--) {
+    ctx.strokeStyle = snakeColor(i, n, now);
+    ctx.lineWidth = width(i);
+    ctx.beginPath();
+    if (linked(pts[i], pts[i - 1])) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); }
+    else { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i].x + .01, pts[i].y); }
+    ctx.stroke();
+  }
+  // Scale highlights.
+  ctx.fillStyle = 'rgba(255,255,255,.16)';
+  for (let i = 2; i < n; i += 2) {
+    ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, width(i) * .2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  // Head.
+  const h = pts[0], r = CELL * .45, fx = dir.x, fy = dir.y, sx = -fy, sy = fx;
+  const dead = state === 'over' && !isWin;
+  ctx.fillStyle = 'rgba(0,0,0,.4)'; ctx.beginPath(); ctx.arc(h.x, h.y, r + CELL * .06, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = skin.rainbow ? snakeColor(0, n, now) : skin.head;
+  ctx.beginPath(); ctx.arc(h.x, h.y, r, 0, Math.PI * 2); ctx.fill();
+
+  // Tongue flick.
+  if (!dead && state !== 'menu' && now % 1700 < 260) {
+    const bx = h.x + fx * r * .95, by = h.y + fy * r * .95;
+    const tx = bx + fx * CELL * .3, ty = by + fy * CELL * .3;
+    ctx.strokeStyle = '#f43f5e'; ctx.lineWidth = Math.max(1.2, CELL * .06);
+    ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(tx, ty);
+    ctx.lineTo(tx + fx * CELL * .1 + sx * CELL * .08, ty + fy * CELL * .1 + sy * CELL * .08);
+    ctx.moveTo(tx, ty); ctx.lineTo(tx + fx * CELL * .1 - sx * CELL * .08, ty + fy * CELL * .1 - sy * CELL * .08);
+    ctx.stroke();
+  }
+  // Eyes.
+  for (const side of [1, -1]) {
+    const ex = h.x + fx * CELL * .1 + sx * CELL * .2 * side;
+    const ey = h.y + fy * CELL * .1 + sy * CELL * .2 * side;
+    if (dead) {
+      const d = CELL * .09;
+      ctx.strokeStyle = '#0f172a'; ctx.lineWidth = Math.max(1.5, CELL * .06);
+      ctx.beginPath(); ctx.moveTo(ex - d, ey - d); ctx.lineTo(ex + d, ey + d); ctx.moveTo(ex + d, ey - d); ctx.lineTo(ex - d, ey + d); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(ex, ey, CELL * .12, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#0f172a'; ctx.beginPath(); ctx.arc(ex + fx * CELL * .045, ey + fy * CELL * .045, CELL * .065, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // Shield aura.
+  if (shield && state !== 'over') {
+    const pr = CELL * (.72 + .06 * Math.sin(now / 160));
+    ctx.strokeStyle = 'rgba(56,189,248,.85)'; ctx.lineWidth = Math.max(1.5, CELL * .08);
+    ctx.setLineDash([CELL * .18, CELL * .12]); ctx.lineDashOffset = -now / 40;
+    ctx.beginPath(); ctx.arc(h.x, h.y, pr, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  if (effects && effects.magnet > gameTime && state === 'playing') {
+    const k = (now % 900) / 900;
+    ctx.strokeStyle = `rgba(244,114,182,${.5 * (1 - k)})`; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(h.x, h.y, CELL * (2.2 - 1.6 * k), 0, Math.PI * 2); ctx.stroke();
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = clamp(p.life, 0, 1);
+    ctx.fillStyle = p.color;
+    ctx.beginPath(); ctx.arc(p.x * CELL, p.y * CELL, p.size * CELL * (.5 + p.life * .5), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawFloaters() {
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    ctx.globalAlpha = clamp(f.life * 1.6, 0, 1);
+    ctx.font = `800 ${Math.round(CELL * f.size * 1.6)}px system-ui, sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2,6,23,.85)';
+    ctx.strokeText(f.text, f.x * CELL, f.y * CELL);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, f.x * CELL, f.y * CELL);
+  }
+  ctx.globalAlpha = 1;
+}
+function drawBanner() {
+  if (!banner) return;
+  const k = banner.t / banner.dur;
+  const a = k < .15 ? k / .15 : k > .75 ? (1 - k) / .25 : 1;
+  const s = k < .15 ? .6 + .4 * easeOutBack(k / .15) : 1;
+  ctx.save();
+  ctx.globalAlpha = clamp(a, 0, 1);
+  ctx.translate(W / 2, W * .38); ctx.scale(s, s);
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.round(W * .11)}px system-ui, sans-serif`;
+  const fit = Math.min(1, W * .88 / ctx.measureText(banner.text).width);
+  ctx.font = `900 ${Math.round(W * .11 * fit)}px system-ui, sans-serif`;
+  ctx.lineWidth = 6; ctx.strokeStyle = 'rgba(2,6,23,.8)';
+  ctx.strokeText(banner.text, 0, 0);
+  const g = ctx.createLinearGradient(-W * .3, 0, W * .3, 0);
+  g.addColorStop(0, '#4ade80'); g.addColorStop(1, '#22d3ee');
+  ctx.fillStyle = g; ctx.fillText(banner.text, 0, 0);
+  if (banner.sub) {
+    ctx.font = `700 ${Math.round(W * .04)}px system-ui, sans-serif`;
+    ctx.lineWidth = 4; ctx.strokeText(banner.sub, 0, W * .08);
+    ctx.fillStyle = '#e2e8f0'; ctx.fillText(banner.sub, 0, W * .08);
+  }
+  ctx.restore();
+}
+function drawCountdown() {
+  const n = Math.ceil(countdownMs / COUNT_STEP);
+  const k = 1 - (countdownMs % COUNT_STEP) / COUNT_STEP;
+  ctx.fillStyle = 'rgba(2,6,23,.35)'; ctx.fillRect(0, 0, W, W);
+  ctx.save();
+  ctx.translate(W / 2, W / 2);
+  const s = 1.3 - .3 * easeOutBack(clamp(k * 2, 0, 1));
+  ctx.scale(s, s);
+  ctx.globalAlpha = 1 - clamp((k - .7) / .3, 0, 1) * .8;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.font = `900 ${Math.round(W * .22)}px system-ui, sans-serif`;
+  ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(2,6,23,.8)'; ctx.strokeText(n, 0, 0);
+  ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 0);
+  ctx.restore();
+  ctx.textAlign = 'center';
+  ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
+  ctx.fillStyle = '#cbd5e1';
+  ctx.fillText(isDaily ? `📅 Daily #${dailyNumber()} · ${mode.name}` : `${mode.name} · ${diff.name}`, W / 2, W * .68);
+  if (coarseMQ.matches && !document.body.classList.contains('pad-on')) {
+    ctx.fillStyle = '#fde047';
+    ctx.fillText('👆 Swipe on the board to steer', W / 2, W * .76);
+  }
+}
+
+// ================================================================
+// HUD & screens
+// ================================================================
+const el = {
+  score: $('score'), level: $('level'), length: $('length'), best: $('best'),
+  energyText: $('energyText'), energyFill: $('energyFill'),
+  combo: $('combo'), comboText: $('comboText'), comboFill: $('comboFill'), chips: $('chips'),
+  soundBtn: $('soundBtn'), pauseBtn: $('pauseBtn'), toast: $('toast'),
+  menu: $('menu'), pauseScreen: $('pauseScreen'), overScreen: $('overScreen'), achScreen: $('achScreen'),
+};
+const hudCache = {};
+function setText(key, node, value, pop) {
+  if (hudCache[key] === value) return;
+  const had = key in hudCache;
+  hudCache[key] = value;
+  node.textContent = value;
+  if (pop && had) { node.classList.remove('pop'); void node.offsetWidth; node.classList.add('pop'); }
+}
+function setStyle(key, fn, value) { if (hudCache[key] !== value) { hudCache[key] = value; fn(value); } }
+
+function updateHud() {
+  setText('score', el.score, String(score), true);
+  setText('level', el.level, String(level), true);
+  setText('length', el.length, String(snake.length));
+  setText('best', el.best, String(Math.max(best, score)));
+
+  if (mode.energy) {
+    const e = clamp(energy, 0, 100);
+    setText('energyText', el.energyText, Math.ceil(e) + '%');
+    setStyle('energyW', v => el.energyFill.style.width = v, e.toFixed(1) + '%');
+    setStyle('energyC', v => el.energyFill.className = v, e <= 20 ? 'low' : e <= 45 ? 'mid' : '');
+  } else {
+    setText('energyText', el.energyText, '∞');
+    setStyle('energyW', v => el.energyFill.style.width = v, '100%');
+    setStyle('energyC', v => el.energyFill.className = v, 'inf');
+  }
+
+  const comboLeft = combo >= 2 ? clamp(1 - (gameTime - lastEatAt) / COMBO_WINDOW, 0, 1) : 0;
+  setText('combo', el.comboText, combo >= 2 ? 'x' + combo : '—', true);
+  setStyle('comboOff', v => el.combo.classList.toggle('off', v), combo < 2);
+  setStyle('comboW', v => el.comboFill.style.width = v, Math.round(comboLeft * 100) + '%');
+
+  const chips = [];
+  if (secret) chips.push([`🌌 Secret ${Math.ceil((secret.until - gameTime) / 1000)}s`, '#c084fc']);
+  if (shield) chips.push([`${POWERS.shield.emoji} Shield`, POWERS.shield.color]);
+  for (const k of ['slow', 'double', 'magnet']) {
+    const left = effects[k] - gameTime;
+    if (left > 0) chips.push([`${POWERS[k].emoji} ${Math.ceil(left / 1000)}s`, POWERS[k].color]);
+  }
+  if (isGhost() && state !== 'over') chips.push(['👻 Invulnerable', '#e2e8f0']);
+  const sig = chips.map(c => c[0]).join('|');
+  setStyle('chips', () => {
+    el.chips.innerHTML = chips.map(([t, c]) => `<span class="chip" style="--c:${c}">${t}</span>`).join('');
+  }, sig);
+
+  setStyle('playing', v => document.body.classList.toggle('playing', v), state === 'playing' || state === 'countdown');
+  const canPause = state === 'playing' || state === 'countdown' || state === 'paused';
+  setStyle('pauseIcon', v => el.pauseBtn.textContent = v, state === 'paused' ? '▶' : '⏸');
+  setStyle('pauseDis', v => el.pauseBtn.disabled = v, !canPause);
+  setStyle('sound', v => el.soundBtn.textContent = v, save.settings.sound ? '🔊' : '🔇');
+}
+
+function showScreen(id) {
+  for (const s of [el.menu, el.pauseScreen, el.overScreen, el.achScreen]) s.classList.toggle('hidden', s.id !== id);
+}
+
+function showOver() {
+  $('overTitle').textContent = isWin ? '🎉 You Win!' : 'Game Over';
+  $('overTitle').className = 'ov-title ' + (isWin ? 'win' : 'bad');
+  $('overReason').textContent = deathReason;
+  $('finalScore').textContent = score;
+  $('newBestBadge').classList.toggle('hidden', !newBest);
+  $('stLevel').textContent = level;
+  $('stLength').textContent = snake.length;
+  $('stFruits').textContent = fruitsEaten;
+  $('stCombo').textContent = 'x' + maxCombo;
+  $('stTime').textContent = fmtTime(gameTime);
+  $('stPowers').textContent = powerCount;
+  const tag = $('overTag');
+  tag.textContent = isDaily
+    ? `📅 Daily #${dailyNumber()} · ${mode.name} · attempt ${dailyState().attempts}`
+    : `${mode.name} · ${diff.name}`;
+  tag.classList.toggle('daily', isDaily);
+  showScreen('overScreen');
+  $('againBtn').focus({ preventScroll: true });
+  prepareShare();
+}
+
+// ---------- Share card ----------
+// The image is built as soon as the game-over screen opens, so the Share tap can
+// call navigator.share() immediately (browsers require it to happen right after a tap).
+function prepareShare() {
+  shareBlob = null;
+  const token = gameId;
+  try {
+    buildShareCard().toBlob(b => { if (token === gameId) shareBlob = b; }, 'image/png');
+  } catch { /* canvas export unavailable: sharing falls back to text only */ }
+}
+
+function shareText() {
+  const what = isDaily ? `Snake Pro Daily #${dailyNumber()}` : `Snake Pro (${mode.name} · ${diff.name})`;
+  return `I scored ${score} in ${what} 🐍 Can you beat me? ${GAME_URL}` + (CREATOR_HANDLE ? ` · by ${CREATOR_HANDLE}` : '');
+}
+
+function buildShareCard() {
+  const Wc = 1080, Hc = 1920;
+  const c = document.createElement('canvas');
+  c.width = Wc; c.height = Hc;
+  const g = c.getContext('2d');
+  const font = (w, px) => `${w} ${px}px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif`;
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+
+  // Background.
+  const bgG = g.createLinearGradient(0, 0, 0, Hc);
+  bgG.addColorStop(0, '#1e1b4b'); bgG.addColorStop(.45, '#0b1120'); bgG.addColorStop(1, '#052e16');
+  g.fillStyle = bgG; g.fillRect(0, 0, Wc, Hc);
+  const glow = g.createRadialGradient(Wc / 2, 820, 50, Wc / 2, 820, 700);
+  glow.addColorStop(0, isDaily ? 'rgba(245,158,11,.28)' : 'rgba(34,197,94,.25)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, Wc, Hc);
+
+  // Title.
+  g.font = font(900, 110);
+  const tg = g.createLinearGradient(240, 0, 840, 0);
+  tg.addColorStop(0, '#4ade80'); tg.addColorStop(1, '#22d3ee');
+  g.fillStyle = tg; g.fillText('🐍 SNAKE PRO', Wc / 2, 150);
+
+  // Mode pill.
+  const pill = isDaily ? `📅 DAILY CHALLENGE #${dailyNumber()}` : `${mode.name.toUpperCase()} · ${diff.name.toUpperCase()}`;
+  g.font = font(800, 44);
+  const pw = g.measureText(pill).width + 80;
+  g.fillStyle = isDaily ? '#f59e0b' : 'rgba(255,255,255,.1)';
+  rr(g, Wc / 2 - pw / 2, 225, pw, 80, 40); g.fill();
+  g.fillStyle = isDaily ? '#422006' : '#e2e8f0'; g.fillText(pill, Wc / 2, 267);
+
+  // Board snapshot.
+  const bs = 820, bx = (Wc - bs) / 2, by = 360;
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,.6)'; g.shadowBlur = 50; g.shadowOffsetY = 20;
+  g.fillStyle = '#070d1f'; rr(g, bx, by, bs, bs, 44); g.fill();
+  g.restore();
+  g.save(); rr(g, bx, by, bs, bs, 44); g.clip();
+  try { g.drawImage(canvas, bx, by, bs, bs); } catch {}
+  g.restore();
+  g.lineWidth = 8; g.strokeStyle = isDaily ? '#f59e0b' : '#22c55e'; rr(g, bx, by, bs, bs, 44); g.stroke();
+
+  // Score.
+  g.fillStyle = '#ffffff'; g.font = font(900, 210);
+  g.fillText(score.toLocaleString(), Wc / 2, 1350);
+  g.fillStyle = '#94a3b8'; g.font = font(800, 42);
+  g.fillText('P O I N T S', Wc / 2, 1470);
+  if (newBest) {
+    g.font = font(900, 44);
+    const nb = '🏆 NEW PERSONAL BEST', nw = g.measureText(nb).width + 70;
+    g.fillStyle = '#fde047'; rr(g, Wc / 2 - nw / 2, 1510, nw, 76, 38); g.fill();
+    g.fillStyle = '#422006'; g.fillText(nb, Wc / 2, 1549);
+  }
+
+  // Stats.
+  const stats = [['LEVEL', level], ['LENGTH', snake.length], ['COMBO', 'x' + maxCombo], ['TIME', fmtTime(gameTime)]];
+  const sw = 220, gap = 20, sx0 = (Wc - (sw * 4 + gap * 3)) / 2, sy = 1600;
+  stats.forEach(([label, val], i) => {
+    const x = sx0 + i * (sw + gap);
+    g.fillStyle = 'rgba(255,255,255,.07)'; rr(g, x, sy, sw, 130, 26); g.fill();
+    g.fillStyle = '#fff'; g.font = font(900, 54); g.fillText(String(val), x + sw / 2, sy + 52);
+    g.fillStyle = '#94a3b8'; g.font = font(800, 26); g.fillText(label, x + sw / 2, sy + 102);
+  });
+
+  // Call to action.
+  // Shrinks the font until the line fits inside the card's margins.
+  const fitText = (text, weight, px, y) => {
+    g.font = font(weight, px);
+    const w = g.measureText(text).width;
+    if (w > Wc - 100) g.font = font(weight, Math.floor(px * (Wc - 100) / w));
+    g.fillText(text, Wc / 2, y);
+  };
+  g.fillStyle = '#fde047';
+  fitText(isDaily ? 'Same board for everyone today. Beat me!' : 'Can you beat my score?', 900, 56, CREATOR_HANDLE ? 1775 : 1800);
+  g.fillStyle = '#4ade80';
+  fitText(`▶ ${SHARE_URL_LABEL}`, 800, 40, CREATOR_HANDLE ? 1840 : 1868);
+  if (CREATOR_HANDLE) {
+    g.fillStyle = '#f472b6';
+    fitText(`Follow ${CREATOR_HANDLE} on TikTok`, 800, 36, 1893);
+  }
+  return c;
+}
+
+async function shareScore() {
+  sfx.click();
+  const text = shareText();
+  const file = shareBlob ? new File([shareBlob], `snake-pro-${score}.png`, { type: 'image/png' }) : null;
+  try {
+    if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text, title: 'Snake Pro' });
+      return;
+    }
+    if (!file && navigator.share) {
+      await navigator.share({ text, title: 'Snake Pro' });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === 'AbortError') return;   // user closed the share sheet
+  }
+  // Desktop fallback: download the card and copy the caption.
+  if (file) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(file);
+    a.download = file.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  let copied = false;
+  try { await navigator.clipboard.writeText(text); copied = true; } catch {}
+  toast(file ? (copied ? '📸 Score card saved · caption copied' : '📸 Score card saved') : (copied ? '📋 Score copied' : '⚠️ Sharing not supported here'));
+}
+
+function goMenu() {
+  gameId++;
+  state = 'menu';
+  setupGame();
+  buildMenu();
+  showScreen('menu');
+}
+
+function pause() {
+  if (state !== 'playing' && state !== 'countdown') return;
+  resumeState = state; state = 'paused';
+  showScreen('pauseScreen');
+}
+function resume() {
+  if (state !== 'paused') return;
+  state = resumeState;
+  showScreen(null);
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+}
+
+// ---------- Menu ----------
+function buildMenu() {
+  const s = save.settings;
+  $('modes').innerHTML = Object.entries(MODES).map(([id, m]) =>
+    `<button class="mode${id === s.mode ? ' sel' : ''}" data-mode="${id}"><span class="ic">${m.icon}</span><span><b>${m.name}</b><small>${m.desc}</small></span></button>`).join('');
+  $('diffs').innerHTML = Object.entries(DIFFS).map(([id, d]) =>
+    `<button class="${id === s.diff ? 'sel' : ''}" data-diff="${id}">${d.name}</button>`).join('');
+  $('skins').innerHTML = Object.entries(SKINS).map(([id, k]) => {
+    const sw = k.rainbow ? 'conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#8b5cf6,#f43f5e)' : `linear-gradient(135deg, ${k.head}, ${k.body} 55%, ${k.tail})`;
+    return `<button class="skin${id === s.skin ? ' sel' : ''}" data-skin="${id}" title="${k.name}" aria-label="${k.name} skin" style="--sw:${sw}"></button>`;
+  }).join('');
+  const b = save.bests[menuBestKey()] || 0;
+  const d = dailyState();
+  $('dailyBtn').firstChild.textContent = `📅 Daily #${dailyNumber()}`;
+  $('dailyInfo').textContent = `${MODES[dailyModeId()].name} · ${d.attempts ? 'best ' + d.best : 'not played'}`;
+  $('dailyBtn').title = 'Same board, fruit and spawns for every player today (Medium difficulty)';
+  $('menuBest').textContent = `Best (${MODES[s.mode].name} · ${DIFFS[s.diff].name}): ${b}`;
+  const got = ACHIEVEMENTS.filter(a => save.achievements[a.id]).length;
+  $('achBtn').textContent = `🏆 ${got}/${ACHIEVEMENTS.length}`;
+  hudCache.best = null;
+}
+function buildAchievements() {
+  $('achList').innerHTML = ACHIEVEMENTS.map(a => {
+    const got = save.achievements[a.id], mystery = a.hidden && !got;
+    return `<div class="ach${got ? '' : ' locked'}"><span class="ic">${mystery ? '❔' : a.icon}</span><span><b>${mystery ? '???' : a.name}</b><small>${mystery ? 'Hidden achievement' : a.desc}</small></span></div>`;
+  }).join('') +
+    `<div class="hint">${save.stats.games} games played · ${save.stats.fruits} fruits eaten · ${fmtTime(save.stats.playMs)} total</div>`;
+}
+$('menu').addEventListener('click', e => {
+  const m = e.target.closest('button[data-mode]'), d = e.target.closest('button[data-diff]'), k = e.target.closest('button[data-skin]');
+  if (!m && !d && !k) return;
+  if (m) save.settings.mode = m.dataset.mode;
+  if (d) save.settings.diff = d.dataset.diff;
+  if (k) save.settings.skin = k.dataset.skin;
+  persist(); sfx.click();
+  setupGame(); buildMenu();
+});
+
+function buildLegend() {
+  $('legend').innerHTML = `
+    <div class="lg-group"><h3>Fruit · points</h3>${FRUITS.map(f => `<span title="${f.name}: +${f.energy}% energy">${f.emoji} +${f.score}</span>`).join('')}<span class="gold" title="Rare, disappears quickly">${GOLDEN.emoji} +${GOLDEN.score}</span></div>
+    <div class="lg-group"><h3>Poison</h3>${HAZARDS.map(h => `<span class="bad" title="${h.name}">${h.emoji} ☠</span>`).join('')}</div>
+    <div class="lg-group"><h3>Power-ups</h3>${Object.values(POWERS).map(p => `<span title="${p.desc}">${p.emoji} ${p.name}</span>`).join('')}</div>`;
+}
+
+// ---------- Toasts ----------
+const toastQueue = [];
+let toastBusy = false;
+function toast(text, ms = 2200) { toastQueue.push({ text, ms }); if (!toastBusy) nextToast(); }
+function nextToast() {
+  const item = toastQueue.shift();
+  if (item == null) { toastBusy = false; return; }
+  const t = item.text;
+  toastBusy = true;
+  el.toast.textContent = t;
+  el.toast.classList.add('show');
+  setTimeout(() => { el.toast.classList.remove('show'); setTimeout(nextToast, 350); }, item.ms);
+}
+
+// ================================================================
+// Input
+// ================================================================
+function queueDir(nd) {
+  if (state !== 'playing' && state !== 'countdown') return;
+  const last = queue.length ? queue[queue.length - 1] : dir;
+  if (nd === last || (nd.x === -last.x && nd.y === -last.y)) return;
+  if (queue.length < 3) queue.push(nd);
+}
+function toggleSound() {
+  save.settings.sound = !save.settings.sound;
+  persist();
+  if (save.settings.sound) sfx.click();
+}
+
+const KEYMAP = { arrowup: U, w: U, arrowdown: D, s: D, arrowleft: L, a: L, arrowright: R, d: R };
+document.addEventListener('keydown', e => {
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = e.key.toLowerCase();
+  // Let a focused button handle its own Enter/Space.
+  if ((k === 'enter' || k === ' ') && e.target.closest && e.target.closest('button')) return;
+
+  if (state === 'menu') {
+    konamiPos = k === KONAMI[konamiPos] ? konamiPos + 1 : (k === KONAMI[0] ? 1 : 0);
+    if (konamiPos === KONAMI.length) {
+      konamiPos = 0;
+      konamiBoost = true;
+      toast('🌌 Something stirs... watch for a portal at level 2');
+      sfx.secret();
+    }
+  }
+
+  if (k === 's' && state === 'over' && !el.overScreen.classList.contains('hidden')) { shareScore(); return; }
+  if (KEYMAP[k]) {
+    if (state === 'playing' || state === 'countdown') { e.preventDefault(); queueDir(KEYMAP[k]); }
+    return;
+  }
+  if (k === 'm') { toggleSound(); return; }
+  const confirm = k === 'enter' || k === ' ';
+  switch (state) {
+    case 'playing': case 'countdown':
+      if (k === 'p' || k === 'escape' || k === ' ') { e.preventDefault(); pause(); }
+      break;
+    case 'paused':
+      if (k === 'p' || k === 'escape' || confirm) { e.preventDefault(); resume(); }
+      break;
+    case 'over':
+      if (confirm) { e.preventDefault(); startGame(isDaily); }
+      else if (k === 'escape') goMenu();
+      break;
+    case 'menu':
+      if (!el.achScreen.classList.contains('hidden')) { if (k === 'escape' || confirm) { e.preventDefault(); showScreen('menu'); } }
+      else if (confirm) { e.preventDefault(); startGame(); }
+      break;
+  }
+});
+
+// Swipe on the board.
+let swipe = null;
+canvas.addEventListener('pointerdown', e => { swipe = { x: e.clientX, y: e.clientY, id: e.pointerId }; });
+canvas.addEventListener('pointermove', e => {
+  if (!swipe || e.pointerId !== swipe.id) return;
+  const dx = e.clientX - swipe.x, dy = e.clientY - swipe.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 20) return;
+  queueDir(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? R : L) : (dy > 0 ? D : U));
+  swipe.x = e.clientX; swipe.y = e.clientY;
+});
+for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) canvas.addEventListener(ev, () => { swipe = null; });
+
+// D-pad.
+document.querySelectorAll('.dbtn').forEach(btn => {
+  btn.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    queueDir(DIRS[btn.dataset.dir]);
+    btn.classList.add('on');
+  });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) btn.addEventListener(ev, () => btn.classList.remove('on'));
+});
+
+// Buttons.
+$('playBtn').addEventListener('click', () => startGame(false));
+$('dailyBtn').addEventListener('click', () => startGame(true));
+$('againBtn').addEventListener('click', () => startGame(isDaily));
+$('restartBtn').addEventListener('click', () => startGame(isDaily));
+$('shareBtn').addEventListener('click', shareScore);
+$('resumeBtn').addEventListener('click', resume);
+$('pauseMenuBtn').addEventListener('click', goMenu);
+$('overMenuBtn').addEventListener('click', goMenu);
+$('achBtn').addEventListener('click', () => { buildAchievements(); showScreen('achScreen'); });
+$('achBack').addEventListener('click', () => showScreen('menu'));
+el.soundBtn.addEventListener('click', toggleSound);
+el.pauseBtn.addEventListener('click', () => state === 'paused' ? resume() : pause());
+// Drop focus after mouse/touch clicks so Space doesn't re-trigger the button mid-game.
+document.addEventListener('click', e => { const b = e.target.closest('button'); if (b && e.detail > 0) b.blur(); });
+
+document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+
+// Arrow pad: off by default (swipe is the main touch control), remembered once turned on.
+const padBtn = $('padBtn'), fsBtn = $('fsBtn');
+function applyPad() {
+  const on = !!save.settings.dpad && coarseMQ.matches;
+  document.body.classList.toggle('pad-on', on);
+  padBtn.classList.toggle('on', on);
+  padBtn.setAttribute('aria-pressed', String(on));
+  layout();
+}
+padBtn.addEventListener('click', () => {
+  save.settings.dpad = !save.settings.dpad;
+  persist(); sfx.click();
+  applyPad();
+  toast(save.settings.dpad ? '🎮 Arrow buttons on' : '👆 Arrow buttons off: swipe on the board');
+});
+
+// Fullscreen (Android Chrome, desktop). iPhone Safari doesn't support it, so the button stays hidden there.
+const root = document.documentElement;
+const fsRequest = root.requestFullscreen || root.webkitRequestFullscreen;
+const fsExit = document.exitFullscreen || document.webkitExitFullscreen;
+const fsElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+if (fsRequest) fsBtn.classList.remove('hidden');
+fsBtn.addEventListener('click', () => {
+  try {
+    const p = fsElement() ? fsExit.call(document) : fsRequest.call(root, { navigationUI: 'hide' });
+    if (p && p.catch) p.catch(() => {});
+  } catch {}
+});
+for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
+  document.addEventListener(ev, () => {
+    const on = !!fsElement();
+    document.body.classList.toggle('fs', on);
+    fsBtn.classList.toggle('on', on);
+    window.scrollTo(0, 0);
+    requestAnimationFrame(layout);
+  });
+}
+
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', () => setTimeout(layout, 150));
+if (window.visualViewport) visualViewport.addEventListener('resize', layout);
+
+// ================================================================
+// Boot
+// ================================================================
+// ---------- Install as an app (PWA) ----------
+// Android/desktop Chrome & Edge fire beforeinstallprompt; iPhone needs Share → Add to Home Screen.
+const installBtn = $('installBtn');
+let installPrompt = null;
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches ||
+  matchMedia('(display-mode: fullscreen)').matches || navigator.standalone === true;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+  (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function updateInstallBtn() {
+  installBtn.classList.toggle('hidden', isStandalone() || !(installPrompt || isIOS));
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  installPrompt = e;
+  updateInstallBtn();
+});
+window.addEventListener('appinstalled', () => {
+  installPrompt = null;
+  updateInstallBtn();
+  toast('📲 Installed! Snake Pro is on your home screen', 3500);
+});
+installBtn.addEventListener('click', () => {
+  sfx.click();
+  if (installPrompt) {
+    installPrompt.prompt();
+    installPrompt.userChoice.finally(() => { installPrompt = null; updateInstallBtn(); });
+  } else if (isIOS) {
+    toast('On iPhone: tap Share ⬆️ at the bottom of Safari, then "Add to Home Screen"', 6000);
+  }
+});
+updateInstallBtn();
+
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
+}
+
+applyPad();   // also runs layout()
+new ResizeObserver(resize).observe(wrapEl);
+resize();
+setupGame();
+buildMenu();
+buildLegend();
+
+let lastT = performance.now();
+function frame(now) {
+  const dt = Math.min(64, now - lastT);
+  lastT = now;
+  update(dt);
+  render(now);
+  updateHud();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+})();
