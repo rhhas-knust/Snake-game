@@ -1,6 +1,21 @@
 # 🐍 Snake Pro
 
-A single-file snake game for the browser. It has no dependencies and no build step: open `index.html` and play.
+A modern snake game for the browser that installs as an app and works offline. It has no dependencies and no build step.
+
+**▶ Play:** <https://rhhas-knust.github.io/Snake-game/> · **Publishing to stores:** see [PUBLISHING.md](PUBLISHING.md)
+
+## Files
+
+| File | What it is |
+| --- | --- |
+| `index.html` | Page layout and styles |
+| `game.js` | All game code |
+| `manifest.webmanifest`, `sw.js`, `icons/` | Make it installable (PWA) and playable offline |
+| `privacy.html` | Privacy policy (required by app stores) |
+| `og-image.png` | Preview image shown when the link is shared |
+| `screenshots/` | Store listing screenshots |
+
+To run it locally, serve the folder over HTTP (for example `python3 -m http.server`) and open <http://localhost:8000>. Opening `index.html` directly from disk also works, but offline mode needs HTTP.
 
 ## Features
 
@@ -17,7 +32,7 @@ A single-file snake game for the browser. It has no dependencies and no build st
 - **Golden star** 🌟: a rare, short-lived bonus worth 75 points.
 - **Power-ups**: 🛡️ Shield, ⏳ Slow-mo, 💎 Double points, 🧲 Magnet, ✂️ Shrink.
 - **Daily Challenge** 📅: every player in the world gets the same board, fruit order and spawn timing each day (UTC). The mode rotates between Classic, Portal and Maze on Medium difficulty, and your best score and attempts for the day are tracked.
-- **Share score** 📤: the game-over screen builds a 1080×1920 score card (a snapshot of the board, your score and stats, and the game link) that fits TikTok, Instagram Stories and WhatsApp Status. On phones it opens the share sheet. On desktop it downloads the image and copies a caption. To add your TikTok handle to every card, set `CREATOR_HANDLE` in `index.html`.
+- **Share score** 📤: the game-over screen builds a 1080×1920 score card (a snapshot of the board, your score and stats, and the game link) that fits TikTok, Instagram Stories and WhatsApp Status. On phones it opens the share sheet. On desktop it downloads the image and copies a caption. The TikTok handle printed on every card is set by `CREATOR_HANDLE` in `game.js`.
 - **Secret level** 🌌: see the spoiler below.
 - **5 snake skins**, including an animated rainbow skin.
 - **15 achievements** (2 hidden) and lifetime stats.
@@ -25,6 +40,13 @@ A single-file snake game for the browser. It has no dependencies and no build st
 - Keyboard and swipe controls, plus an optional on-screen arrow pad (🎮 button, off by default) and a 3-move input buffer so quick turns aren't dropped.
 - **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button where the browser supports it, and the page doesn't scroll while you swipe.
 - Crisp rendering on HiDPI screens and auto-pause when you switch tabs.
+- **Installable app (PWA)**: 📲 Install button (Android and desktop) or *Add to Home Screen* (iPhone). It gets its own icon, opens full screen and plays offline.
+
+## Privacy & security
+
+- No accounts, analytics, ads or tracking. Progress is saved only in the player's own browser. See [privacy.html](privacy.html).
+- A Content Security Policy only allows the game's own files to run or be fetched.
+- Saved data is validated on load. Every GitHub Pages project on the same account shares browser storage, so the game never trusts what it reads back.
 
 ## Controls
 
