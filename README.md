@@ -19,6 +19,15 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 
 ## Features
 
+### 🇬🇭 Ghana Edition (default world)
+- **Local food:** 🍍 Pineapple, 🍌 Plantain, 🥜 Groundnuts, 🥑 Pear (avocado), 🥭 Mango. **Poison:** 🌶️ Raw Pepper, 🍄 Wild Mushroom. The bonus is the ⭐ **Black Star** from the Ghana flag.
+- **Twi words:** the countdown is *Mmiɛnsa · Mmienu · Baako · KƆ!*, levelling up shows *Ayekoo!* (well done), the menu greets you with *Akwaaba!* (welcome), and game over is *Due!* (sorry). The ❓ panel has a glossary.
+- **Kente** and **Black Stars** snake skins, a deep-green board with a gold border, and "Ghana Edition" on share cards.
+- **Original music:** a highlife and palm-wine style loop built on the West African 12-pulse bell pattern. It's synthesised live (no audio files), speeds up with the level and slows in Slow-mo. Switch it off in the 🎮 panel.
+- A **Classic** world (apple, banana and so on) is one tap away on the menu. Both worlds use the same point values, so Daily Challenge scores stay comparable.
+
+### Gameplay & features
+
 - **4 game modes**
   - **Classic**: hitting a wall ends the game.
   - **Portal**: the snake wraps around the edges.

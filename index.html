@@ -115,7 +115,7 @@
     background: rgb(2 6 23 / .74); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
     animation: fade .2s ease-out;
   }
-  .ov-inner { margin: auto; width: 100%; max-width: 24em; display: flex; flex-direction: column; align-items: center; gap: .55em; text-align: center; }
+  .ov-inner { margin: auto; width: 100%; max-width: 24em; display: flex; flex-direction: column; align-items: center; gap: .45em; text-align: center; }
   @keyframes fade { from { opacity: 0; } }
   .label { align-self: flex-start; font-size: .64em; text-transform: uppercase; letter-spacing: .1em; font-weight: 800; color: var(--muted); margin-bottom: -4px; }
 
@@ -160,6 +160,12 @@
   .over-btns button { padding: 11px 14px; font-size: .92em; white-space: nowrap; }
   .over-tag { font-size: .66em; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-bottom: -6px; }
   .over-tag.daily { color: var(--gold); }
+  .hello { font-weight: 900; font-size: 1.05em; line-height: 1; color: var(--gold); }
+  /* Ghana flag: red, gold, green with the black star */
+  .flag-gh { position: relative; display: inline-block; width: 1.5em; height: 1em; border-radius: 2px; vertical-align: -.15em;
+    background: linear-gradient(#ce1126 0 33.3%, #fcd116 33.3% 66.6%, #006b3f 66.6%); }
+  .flag-gh::after { content: '★'; position: absolute; inset: 0; display: grid; place-items: center; color: #000; font-size: .5em; line-height: 1; }
+  body[data-theme="ghana"] .board-wrap:not([data-mode="portal"]):not([data-mode="zen"]):not([data-mode="secret"]) { border-color: #b8860b; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 22px rgb(252 209 22 / .18); }
   .install-btn {
     width: 100%; cursor: pointer; border-radius: 12px; padding: .55em 1em; font-weight: 800; font-size: .85em;
     background: rgb(56 189 248 / .12); color: #7dd3fc; border: 1.5px dashed rgb(56 189 248 / .55);
@@ -341,6 +347,8 @@
 
     <div class="overlay" id="menu" role="dialog" aria-modal="true" aria-label="Main menu">
       <div class="ov-inner">
+        <div class="hello hidden" id="hello"></div>
+        <div class="seg" id="themes" role="group" aria-label="World"></div>
         <div class="label">Mode</div>
         <div class="modes" id="modes"></div>
         <div class="label">Difficulty</div>
@@ -452,7 +460,7 @@
 
 <section class="sheet hidden" id="ctrlSheet" role="dialog" aria-modal="true" aria-labelledby="ctrlTitle">
   <header class="sheet-head">
-    <h2 id="ctrlTitle">🎮 Controls</h2>
+    <h2 id="ctrlTitle">🎮 Controls &amp; sound</h2>
     <button class="icon-btn" data-close aria-label="Close">✕</button>
   </header>
   <div class="sheet-body">
@@ -483,6 +491,7 @@
     </div>
 
     <p class="desk-only ctrl-note">On a computer, the arrow keys or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> always work.</p>
+    <button class="ghost-btn wide" id="musicBtn" aria-pressed="true">🎵 Music: On</button>
     <button class="ghost-btn wide hidden" id="fsBtn">⛶ Fullscreen</button>
   </div>
 </section>

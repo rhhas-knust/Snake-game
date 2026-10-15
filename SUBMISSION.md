@@ -19,14 +19,14 @@ Copy and paste from this file when filling in the challenge form and the store o
 ---
 
 ## Title
-Snake Pro
+Snake Pro: Ghana Edition
 
 ## Tagline (short description, one line)
 A modern snake game with power-ups, combos, a Daily Challenge, and a secret level hidden inside.
 
 ## Description
 
-> **Snake Pro** takes the classic snake game and adds modern features.
+> **Snake Pro: Ghana Edition** takes the classic snake game and gives it a Ghanaian identity. You eat pineapple, plantain, groundnuts and mango, dodge raw pepper, chase the ⭐ Black Star, count down in Twi (*Mmiɛnsa, Mmienu, Baako, KƆ!*), earn an *Ayekoo!* every level, and play to an original highlife-style soundtrack built on the West African bell pattern. Kente and Black Stars skins included.
 >
 > 🎮 **4 modes**:
 > - **Classic:** walls are deadly.
