@@ -43,11 +43,11 @@ const PORTAL = { id: 'portal', emoji: '🌀', name: 'Secret Portal', life: 10000
 const SECRET_MS = 20000;
 const SECRET_CANDY_COUNT = 12;
 const CANDIES = [
-  { id: 'candy',    emoji: '🍬', name: 'Candy',    score: 30,  energy: 0, weight: 30, glow: '#f472b6' },
-  { id: 'lolly',    emoji: '🍭', name: 'Lollipop', score: 40,  energy: 0, weight: 24, glow: '#c084fc' },
-  { id: 'donut',    emoji: '🍩', name: 'Donut',    score: 35,  energy: 0, weight: 24, glow: '#fbbf24' },
-  { id: 'cupcake',  emoji: '🧁', name: 'Cupcake',  score: 50,  energy: 0, weight: 14, glow: '#fb7185' },
-  { id: 'crown',    emoji: '👑', name: 'Crown',    score: 200, energy: 0, weight: 2,  glow: '#fde047' },
+  { id: 'candy',    emoji: '🍬', name: 'Candy',    score: 10,  energy: 0, weight: 30, glow: '#f472b6' },
+  { id: 'lolly',    emoji: '🍭', name: 'Lollipop', score: 15,  energy: 0, weight: 24, glow: '#c084fc' },
+  { id: 'donut',    emoji: '🍩', name: 'Donut',    score: 12,  energy: 0, weight: 24, glow: '#fbbf24' },
+  { id: 'cupcake',  emoji: '🧁', name: 'Cupcake',  score: 20,  energy: 0, weight: 14, glow: '#fb7185' },
+  { id: 'crown',    emoji: '👑', name: 'Crown',    score: 100, energy: 0, weight: 2,  glow: '#fde047' },
 ];
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
 const HAZARDS = [
@@ -189,14 +189,19 @@ const sfx = {
   poof()     { tone(220, .12, 'triangle', .15, 0, 110); },
 };
 const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
-const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Respects the system "reduce motion" setting: no screen shake, a much fainter hit flash.
+const motionMQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+const reduceMotion = () => !!(motionMQ && motionMQ.matches);
 
 // ================================================================
 // Helpers
 // ================================================================
-// Gameplay randomness goes through rng() so the Daily Challenge can be seeded.
-// Purely visual randomness (particles, stars) uses frand() and never touches the seed.
-let rng = Math.random;
+// Gameplay randomness: every random event draws from its own numbered stream, e.g. "fruit #7",
+// seeded from the game's seed. The 7th fruit is therefore always the same fruit and tries the same
+// squares in the same order, no matter what the player did before. For the Daily Challenge the seed
+// is the date, so every player gets the same sequence. Purely visual randomness uses frand().
+let seedBase = '';
+let streamCounters = {};
 function mulberry32(seed) {
   return () => {
     seed = (seed + 0x6D2B79F5) | 0;
@@ -210,8 +215,9 @@ function hashString(s) {
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0;
 }
-const rand = (a, b) => a + rng() * (b - a);
-const randInt = n => Math.floor(rng() * n);
+const stream = (name, i) => mulberry32(hashString(`${seedBase}|${name}|${i}`));
+const nextStream = name => stream(name, streamCounters[name] = (streamCounters[name] || 0) + 1);
+const between = (r, a, b) => a + r() * (b - a);
 const frand = (a, b) => a + Math.random() * (b - a);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const cellKey = (x, y) => x + ',' + y;
@@ -222,8 +228,8 @@ function mixHex(a, b, t) {
   const A = hexRgb(a), B = hexRgb(b);
   return `rgb(${A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',')})`;
 }
-function pickWeighted(list) {
-  let r = rng() * list.reduce((s, f) => s + f.weight, 0);
+function pickWeighted(list, rnd) {
+  let r = rnd() * list.reduce((s, f) => s + f.weight, 0);
   for (const f of list) if ((r -= f.weight) < 0) return f;
   return list[0];
 }
@@ -255,11 +261,12 @@ function setupGame(daily = false) {
   isDaily = daily;
   if (daily) {
     modeId = dailyModeId(); diffId = DAILY_DIFF;
-    rng = mulberry32(hashString('snakepro-daily-' + todayKey()));
+    seedBase = 'snakepro-daily-' + todayKey();
   } else {
     modeId = save.settings.mode; diffId = save.settings.diff;
-    rng = Math.random;
+    seedBase = Math.random().toString(36).slice(2) + Date.now();
   }
+  streamCounters = {};
   mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
   snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
   prevSnake = snake.map(s => ({ ...s }));
@@ -280,8 +287,8 @@ function setupGame(daily = false) {
   shareBlob = null;
   spawnFruit();
   scheduleHazard();
-  nextPowerAt = rand(9000, 15000);
-  nextGoldenAt = rand(15000, 25000);
+  nextPowerAt = between(nextStream('powerTime'), 9000, 15000);
+  nextGoldenAt = between(nextStream('goldenTime'), 15000, 25000);
   wrapEl.dataset.mode = modeId;
 }
 
@@ -321,26 +328,36 @@ function isFree(x, y, snakeSet) {
   if (snakeSet.has(cellKey(x, y))) return false;
   return !items.some(i => i.x === x && i.y === y);
 }
-function randomFree(avoidHead = 0) {
+// Picks a square from the stream's own sequence of candidate squares, so two players get the
+// same square whenever it's free on both their boards. Falls back to a scan on a crowded board.
+function randomFree(r, avoidHead = 0) {
   const snakeSet = new Set(snake.map(s => cellKey(s.x, s.y)));
   const h = snake[0];
-  const cells = [], fallback = [];
-  for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-    if (!isFree(x, y, snakeSet)) continue;
-    fallback.push({ x, y });
-    if (Math.abs(x - h.x) + Math.abs(y - h.y) >= avoidHead) cells.push({ x, y });
+  const ok = (x, y, strict) => isFree(x, y, snakeSet) &&
+    (!strict || Math.abs(x - h.x) + Math.abs(y - h.y) >= avoidHead);
+  for (let t = 0; t < 80; t++) {
+    const x = Math.floor(r() * COLS), y = Math.floor(r() * ROWS);
+    if (ok(x, y, true)) return { x, y };
   }
-  const pool = cells.length ? cells : fallback;
-  return pool.length ? pool[randInt(pool.length)] : null;
+  const total = COLS * ROWS, start = Math.floor(r() * total);
+  for (const strict of [true, false]) {
+    for (let k = 0; k < total; k++) {
+      const i = (start + k) % total, x = i % COLS, y = Math.floor(i / COLS);
+      if (ok(x, y, strict)) return { x, y };
+    }
+  }
+  return null;
 }
 function spawnFruit() {
-  const c = randomFree(2);
+  const r = nextStream('fruit');
+  const type = pickWeighted(FRUITS, r);
+  const c = randomFree(r, 2);
   if (!c) return false;
-  items.push({ ...c, kind: 'fruit', type: pickWeighted(FRUITS), born: gameTime });
+  items.push({ ...c, kind: 'fruit', type, born: gameTime });
   return true;
 }
 function spawnGolden() {
-  const c = randomFree(4);
+  const c = randomFree(nextStream('golden'), 4);
   if (!c) return;
   items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
   floater(c.x + .5, c.y - .2, 'Golden!', GOLDEN.glow, .45);
@@ -348,16 +365,19 @@ function spawnGolden() {
 function spawnHazard() {
   const max = Math.min(4, 1 + Math.floor(level / 3));
   if (items.filter(i => i.kind === 'hazard').length >= max) return;
-  const c = randomFree(5);
+  const r = nextStream('hazard');
+  const type = HAZARDS[Math.floor(r() * HAZARDS.length)];
+  const life = between(r, 6000, 9000);
+  const c = randomFree(r, 5);
   if (!c) return;
-  const life = rand(6000, 9000);
-  items.push({ ...c, kind: 'hazard', type: HAZARDS[randInt(HAZARDS.length)], born: gameTime, expires: gameTime + life, life });
+  items.push({ ...c, kind: 'hazard', type, born: gameTime, expires: gameTime + life, life });
 }
 function scheduleHazard() {
-  nextHazardAt = gameTime + rand(5000, 10000) * Math.max(0.45, 1 - level * 0.05);
+  nextHazardAt = gameTime + between(nextStream('hazardTime'), 5000, 10000) * Math.max(0.45, 1 - level * 0.05);
 }
 function spawnPower() {
   if (items.some(i => i.kind === 'power')) return;
+  const r = nextStream('power');
   const pool = [
     { p: POWERS.shield, weight: shield ? 0 : 3 },
     { p: POWERS.slow,   weight: 2 },
@@ -365,10 +385,11 @@ function spawnPower() {
     { p: POWERS.magnet, weight: 2 },
     { p: POWERS.shrink, weight: snake.length > 10 ? 2 : 0 },
   ].filter(o => o.weight > 0);
-  const c = randomFree(4);
+  const type = pickWeighted(pool, r).p;
+  const c = randomFree(r, 4);
   if (!c) return;
   const life = 8000;
-  items.push({ ...c, kind: 'power', type: pickWeighted(pool).p, born: gameTime, expires: gameTime + life, life });
+  items.push({ ...c, kind: 'power', type, born: gameTime, expires: gameTime + life, life });
 }
 
 // ---------- Core update ----------
@@ -433,15 +454,14 @@ function consume(item) {
   } else if (item.kind === 'power') {
     applyPower(t, cx, cy);
   } else if (item.kind === 'candy') {
-    combo = (gameTime - lastEatAt <= COMBO_WINDOW) ? Math.min(combo + 1, MAX_COMBO) : 1;
-    lastEatAt = gameTime;
-    maxCombo = Math.max(maxCombo, combo);
-    const pts = t.score * combo * (effects.double > gameTime ? 2 : 1);
+    // Candy is a flat bonus: no combo or x2 multipliers, so the 20-second secret stage can't
+    // outscore an entire normal game.
+    const pts = t.score;
     score += pts;
     if (secret) secret.points += pts;
     burst(cx, cy, t.glow, t.id === 'crown' ? 30 : 12, 4);
     floater(cx, cy - .2, '+' + pts, t.id === 'crown' ? '#fde047' : '#f5d0fe', .5);
-    if (t.id === 'crown') sfx.golden(); else sfx.eat(combo);
+    if (t.id === 'crown') sfx.golden(); else sfx.eat(1);
     if (secret) spawnCandy();
   } else if (item.kind === 'portal') {
     enterSecret();
@@ -451,7 +471,7 @@ function consume(item) {
 
 // ---------- Secret level ----------
 function spawnPortal() {
-  const c = randomFree(4);
+  const c = randomFree(stream('portalSpot', level), 4);
   if (!c) return;
   portalSpawned = true;
   if (!isDaily) konamiBoost = false;
@@ -460,8 +480,10 @@ function spawnPortal() {
   sfx.portal();
 }
 function spawnCandy() {
-  const c = randomFree(2);
-  if (c) items.push({ ...c, kind: 'candy', type: pickWeighted(CANDIES), born: gameTime });
+  const r = nextStream('candy');
+  const type = pickWeighted(CANDIES, r);
+  const c = randomFree(r, 2);
+  if (c) items.push({ ...c, kind: 'candy', type, born: gameTime });
 }
 function enterSecret() {
   secret = { until: gameTime + SECRET_MS, rocks: obstacleList, points: 0 };
@@ -476,6 +498,7 @@ function enterSecret() {
   shake = Math.max(shake, 8);
   banner = { text: 'SECRET LEVEL', sub: `Candy rush! ${SECRET_MS / 1000} seconds`, t: 0, dur: 1800 };
   sfx.secret(); vibrate(80);
+  announce(`Secret level! Eat candy for ${SECRET_MS / 1000} seconds.`);
   wrapEl.dataset.mode = 'secret';
 }
 function exitSecret() {
@@ -490,8 +513,8 @@ function exitSecret() {
   ghostUntil = gameTime + 2000;   // grace period to find your bearings
   spawnFruit();
   scheduleHazard();
-  nextPowerAt = gameTime + rand(6000, 12000);
-  nextGoldenAt = gameTime + rand(15000, 25000);
+  nextPowerAt = gameTime + between(nextStream('powerTime'), 6000, 12000);
+  nextGoldenAt = gameTime + between(nextStream('goldenTime'), 15000, 25000);
   banner = { text: 'WELCOME BACK', sub: `+${s.points} secret points`, t: 0, dur: 1800 };
   sfx.portal();
   wrapEl.dataset.mode = modeId;
@@ -554,18 +577,20 @@ function levelUp() {
   sfx.level();
   let sub = 'Speed up!';
   if (mode.maze) {
+    const r = stream('rocks', level);
     for (let i = 0; i < 3; i++) {
-      const c = randomFree(5);
+      const c = randomFree(r, 5);
       if (c) addRock(c.x, c.y, gameTime);
     }
     sub = 'New rocks appeared!';
   }
   banner = { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
+  announce(`Level ${level}. ${sub}`);
   // The portal opens at most once per game: 40% chance from level 4, guaranteed at level 6.
   // The cheat code is ignored in the Daily Challenge so it stays fair for everyone.
   const boost = konamiBoost && !isDaily;
   const portalLevel = boost ? 2 : 4;
-  if (!portalSpawned && level >= portalLevel && (boost || level >= 6 || rng() < .4)) spawnPortal();
+  if (!portalSpawned && level >= portalLevel && (boost || level >= 6 || stream('portal', level)() < .4)) spawnPortal();
   checkAchievements();
 }
 
@@ -581,7 +606,7 @@ function die(reason, win = false) {
     for (let i = 0; i < 6; i++) burst(frand(2, COLS - 2), frand(2, ROWS - 2), ['#fde047', '#4ade80', '#38bdf8', '#f472b6'][i % 4], 24, 6);
   } else {
     sfx.die(); vibrate(160);
-    shake = reduceMotion ? 0 : 16; flash = 1;
+    shake = 16; flash = 1;
     burst(h.x + .5, h.y + .5, '#ef4444', 30, 7);
     snake.forEach((s, i) => { if (i % 2 === 0) burst(s.x + .5, s.y + .5, '#94a3b8', 3, 2); });
   }
@@ -631,6 +656,7 @@ function update(dt) {
       state = 'playing';
       banner = { text: 'GO!', sub: '', t: 0, dur: 700 };
       sfx.count(true);
+      announce(`Go! ${isDaily ? 'Daily Challenge, ' : ''}${mode.name} mode.`);
     } else if (after !== before) sfx.count(false);
     return;
   }
@@ -663,10 +689,10 @@ function update(dt) {
     }
   }
   if (mode.hazards && gameTime >= nextHazardAt) { spawnHazard(); scheduleHazard(); }
-  if (gameTime >= nextPowerAt) { spawnPower(); nextPowerAt = gameTime + rand(11000, 18000); }
+  if (gameTime >= nextPowerAt) { spawnPower(); nextPowerAt = gameTime + between(nextStream('powerTime'), 11000, 18000); }
   if (gameTime >= nextGoldenAt) {
     if (!items.some(i => i.kind === 'golden')) spawnGolden();
-    nextGoldenAt = gameTime + rand(20000, 32000);
+    nextGoldenAt = gameTime + between(nextStream('goldenTime'), 20000, 32000);
   }
   if (combo > 0 && gameTime - lastEatAt > COMBO_WINDOW) combo = 0;
 }
@@ -710,7 +736,7 @@ let W = 0, CELL = 0, DPR = 1;
 function resize() {
   const w = wrapEl.clientWidth;
   if (!w) return;
-  W = w; DPR = Math.min(window.devicePixelRatio || 1, 3);
+  W = w; DPR = Math.min(window.devicePixelRatio || 1, 2);   // 2x is visually indistinguishable on phones and half the pixels of 3x
   canvas.width = Math.round(W * DPR); canvas.height = Math.round(W * DPR);
   CELL = W / COLS;
   wrapEl.style.setProperty('--ov-fs', clamp(W / 28, 10.5, 16).toFixed(1) + 'px');
@@ -787,7 +813,7 @@ function render(now) {
   if (!W) return;
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#070d1f'; ctx.fillRect(0, 0, W, W);
-  if (shake > 0.2) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
+  if (shake > 0.2 && !reduceMotion()) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
   if (secret) drawStarfield(now); else ctx.drawImage(bg, 0, 0, W, W);
 
   drawRocks();
@@ -797,7 +823,7 @@ function render(now) {
   drawFloaters();
 
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  if (flash > 0) { ctx.fillStyle = `rgba(239,68,68,${flash * .28})`; ctx.fillRect(0, 0, W, W); }
+  if (flash > 0) { ctx.fillStyle = `rgba(239,68,68,${flash * (reduceMotion() ? .08 : .28)})`; ctx.fillRect(0, 0, W, W); }
   if (effects && effects.slow > gameTime && state !== 'menu') {
     ctx.fillStyle = 'rgba(167,139,250,.07)'; ctx.fillRect(0, 0, W, W);
   }
@@ -893,26 +919,39 @@ function drawSnake(now) {
   ctx.globalAlpha = ghost ? .5 + .3 * Math.sin(now / 55) : 1;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
 
-  // Outline pass, then colour pass (tail first so the head sits on top).
-  ctx.strokeStyle = 'rgba(0,0,0,.4)';
-  for (let i = n - 1; i > 0; i--) {
-    if (!linked(pts[i], pts[i - 1])) continue;
-    ctx.lineWidth = width(i) + CELL * .12;
-    ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); ctx.stroke();
-  }
-  for (let i = n - 1; i > 0; i--) {
-    ctx.strokeStyle = snakeColor(i, n, now);
-    ctx.lineWidth = width(i);
+  // The body is drawn in at most 24 batches (one stroke per colour band) instead of one stroke
+  // per segment, which keeps long snakes smooth on slow phones. Short snakes still get one band
+  // per segment. Outline pass first, then colour, tail first so the head sits on top.
+  const B = Math.max(1, Math.ceil((n - 1) / 24));
+  const bands = [];
+  for (let hi = n - 1; hi > 0; hi -= B) bands.push([hi, Math.max(0, hi - B)]);
+  const trace = (hi, lo) => {
     ctx.beginPath();
-    if (linked(pts[i], pts[i - 1])) { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i - 1].x, pts[i - 1].y); }
-    else { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i].x + .01, pts[i].y); }
-    ctx.stroke();
+    ctx.moveTo(pts[hi].x, pts[hi].y); ctx.lineTo(pts[hi].x + .01, pts[hi].y);
+    for (let i = hi - 1; i >= lo; i--) {
+      if (linked(pts[i + 1], pts[i])) ctx.lineTo(pts[i].x, pts[i].y);
+      else { ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[i].x + .01, pts[i].y); }   // wrapped through an edge
+    }
+  };
+  ctx.strokeStyle = 'rgba(0,0,0,.4)';
+  for (const [hi, lo] of bands) {
+    ctx.lineWidth = width((hi + lo) >> 1) + CELL * .12;
+    trace(hi, lo); ctx.stroke();
   }
-  // Scale highlights.
+  for (const [hi, lo] of bands) {
+    const mid = (hi + lo) >> 1;
+    ctx.strokeStyle = snakeColor(mid, n, now);
+    ctx.lineWidth = width(mid);
+    trace(hi, lo); ctx.stroke();
+  }
+  // Scale highlights, all in one path.
   ctx.fillStyle = 'rgba(255,255,255,.16)';
+  ctx.beginPath();
   for (let i = 2; i < n; i += 2) {
-    ctx.beginPath(); ctx.arc(pts[i].x, pts[i].y, width(i) * .2, 0, Math.PI * 2); ctx.fill();
+    const rad = width(i) * .2;
+    ctx.moveTo(pts[i].x + rad, pts[i].y); ctx.arc(pts[i].x, pts[i].y, rad, 0, Math.PI * 2);
   }
+  ctx.fill();
 
   // Head.
   const h = pts[0], r = CELL * .45, fx = dir.x, fy = dir.y, sx = -fy, sy = fx;
@@ -1090,8 +1129,12 @@ function updateHud() {
   setStyle('sound', v => el.soundBtn.textContent = v, save.settings.sound ? '🔊' : '🔇');
 }
 
+// Shows one overlay (or none) and moves keyboard focus into it so keyboard and
+// screen-reader users land on its main button.
+const SCREEN_FOCUS = { menu: 'playBtn', pauseScreen: 'resumeBtn', overScreen: 'againBtn', achScreen: 'achBack' };
 function showScreen(id) {
   for (const s of [el.menu, el.pauseScreen, el.overScreen, el.achScreen]) s.classList.toggle('hidden', s.id !== id);
+  if (id && SCREEN_FOCUS[id]) $(SCREEN_FOCUS[id]).focus({ preventScroll: true });
 }
 
 function showOver() {
@@ -1112,7 +1155,7 @@ function showOver() {
     : `${mode.name} · ${diff.name}`;
   tag.classList.toggle('daily', isDaily);
   showScreen('overScreen');
-  $('againBtn').focus({ preventScroll: true });
+  announce(`${isWin ? 'You win!' : 'Game over.'} ${deathReason}. Score ${score}${newBest ? ', a new personal best' : ''}.`);
   prepareShare();
 }
 
@@ -1311,7 +1354,13 @@ function buildLegend() {
 // ---------- Toasts ----------
 const toastQueue = [];
 let toastBusy = false;
-function toast(text, ms = 2200) { toastQueue.push({ text, ms }); if (!toastBusy) nextToast(); }
+function toast(text, ms = 2200) { toastQueue.push({ text, ms }); announce(text); if (!toastBusy) nextToast(); }
+// Screen-reader announcements for moments that only appear on the canvas.
+function announce(text) {
+  const live = $('srLive');
+  live.textContent = '';
+  setTimeout(() => { live.textContent = text; }, 50);
+}
 function nextToast() {
   const item = toastQueue.shift();
   if (item == null) { toastBusy = false; return; }

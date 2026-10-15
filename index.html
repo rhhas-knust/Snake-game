@@ -48,6 +48,10 @@
   button { font-family: inherit; }
   button:focus-visible { outline: 2px solid var(--info); outline-offset: 2px; }
   .hidden { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+  }
 
   .app { width: min(100%, 520px); padding: 12px 16px 24px; display: flex; flex-direction: column; gap: 10px; }
 
@@ -281,7 +285,7 @@
     </div>
   </header>
 
-  <section class="hud" aria-live="polite">
+  <section class="hud">
     <div class="stat"><span>Score</span><strong id="score">0</strong></div>
     <div class="stat"><span>Level</span><strong id="level">1</strong></div>
     <div class="stat"><span>Length</span><strong id="length">4</strong></div>
@@ -298,9 +302,9 @@
   </section>
 
   <div class="board-wrap" id="boardWrap">
-    <canvas id="board" aria-label="Snake game board"></canvas>
+    <canvas id="board" role="img" aria-label="Snake game board. Use the arrow keys or swipe to steer."></canvas>
 
-    <div class="overlay" id="menu">
+    <div class="overlay" id="menu" role="dialog" aria-modal="true" aria-label="Main menu">
       <div class="ov-inner">
         <div class="label">Mode</div>
         <div class="modes" id="modes"></div>
@@ -317,9 +321,9 @@
       </div>
     </div>
 
-    <div class="overlay hidden" id="pauseScreen">
+    <div class="overlay hidden" id="pauseScreen" role="dialog" aria-modal="true" aria-labelledby="pauseTitle">
       <div class="ov-inner">
-        <div class="ov-title">Paused</div>
+        <div class="ov-title" id="pauseTitle">Paused</div>
         <div class="btn-row">
           <button class="primary" id="resumeBtn">▶ Resume</button>
         </div>
@@ -331,7 +335,7 @@
       </div>
     </div>
 
-    <div class="overlay hidden" id="overScreen">
+    <div class="overlay hidden" id="overScreen" role="dialog" aria-modal="true" aria-labelledby="overTitle" aria-describedby="overReason">
       <div class="ov-inner">
         <div class="over-tag" id="overTag">Classic · Medium</div>
         <div class="ov-title bad" id="overTitle">Game Over</div>
@@ -355,16 +359,18 @@
       </div>
     </div>
 
-    <div class="overlay hidden" id="achScreen">
+    <div class="overlay hidden" id="achScreen" role="dialog" aria-modal="true" aria-labelledby="achTitle">
       <div class="ov-inner">
-        <div class="ov-title">🏆 Achievements</div>
+        <div class="ov-title" id="achTitle">🏆 Achievements</div>
         <div class="ach-list" id="achList"></div>
         <button class="ghost-btn" id="achBack">← Back</button>
       </div>
     </div>
 
-    <div class="toast" id="toast"></div>
+    <div class="toast" id="toast" aria-hidden="true"></div>
   </div>
+  <!-- Screen-reader announcements (game start, level up, game over, achievements) -->
+  <div class="sr-only" id="srLive" aria-live="polite" aria-atomic="true"></div>
 
   <div class="dpad" id="dpad">
     <button class="dbtn up" data-dir="up" aria-label="Up">▲</button>
