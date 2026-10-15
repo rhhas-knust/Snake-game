@@ -2,7 +2,7 @@
 
 A modern snake game for the browser that installs as an app and works offline. It has no dependencies and no build step.
 
-**▶ Play:** <https://rhhas-knust.github.io/Snake-game/> · **Publishing to stores:** see [PUBLISHING.md](PUBLISHING.md)
+**▶ Play:** <https://rhhas-knust.github.io/Snake-game/> · **Publishing to stores:** [PUBLISHING.md](PUBLISHING.md) · **Challenge submission kit:** [SUBMISSION.md](SUBMISSION.md)
 
 ## Files
 
@@ -31,7 +31,7 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 - **Poison** (🥥 🥚): deadly, but each one disappears after a few seconds.
 - **Golden star** 🌟: a rare, short-lived bonus worth 75 points.
 - **Power-ups**: 🛡️ Shield, ⏳ Slow-mo, 💎 Double points, 🧲 Magnet, ✂️ Shrink.
-- **Daily Challenge** 📅: every player in the world gets the same board, fruit order and spawn timing each day (UTC). The mode rotates between Classic, Portal and Maze on Medium difficulty, and your best score and attempts for the day are tracked.
+- **Daily Challenge** 📅: every player in the world gets the same sequence of fruit, poison, power-ups and spawn times each day (UTC). Each item has its own seeded random stream, so the sequence stays identical however differently people play (an item only moves if its square is under your snake). The mode rotates between Classic, Portal and Maze on Medium difficulty, and your best score and attempts for the day are tracked.
 - **Share score** 📤: the game-over screen builds a 1080×1920 score card (a snapshot of the board, your score and stats, and the game link) that fits TikTok, Instagram Stories and WhatsApp Status. On phones it opens the share sheet. On desktop it downloads the image and copies a caption. The TikTok handle printed on every card is set by `CREATOR_HANDLE` in `game.js`.
 - **Secret level** 🌌: see the spoiler below.
 - **5 snake skins**, including an animated rainbow skin.
@@ -40,6 +40,7 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 - Keyboard and swipe controls, plus an optional on-screen arrow pad (🎮 button, off by default) and a 3-move input buffer so quick turns aren't dropped.
 - **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button where the browser supports it, and the page doesn't scroll while you swipe.
 - Crisp rendering on HiDPI screens and auto-pause when you switch tabs.
+- **Accessible**: screen-reader announcements for game start, level-ups, the secret level and game over; menus are proper dialogs that move keyboard focus to their main button; the system *reduce motion* setting turns off screen shake, flashing and blinking.
 - **Installable app (PWA)**: 📲 Install button (Android and desktop) or *Add to Home Screen* (iPhone). It gets its own icon, opens full screen and plays offline.
 
 ## Privacy & security
@@ -63,7 +64,7 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 <summary>⚠️ Spoiler: the secret level</summary>
 
 - From level 4 onward, each level-up has a 40% chance to open a swirling 🌀 portal, and it's guaranteed at level 6. The portal appears at most once per game and closes after 10 seconds.
-- Enter the portal to warp to a **starfield candy stage** for 20 seconds. The board is full of 🍬 🍭 🍩 🧁 and a rare 👑 crown worth 200 points. There's no poison and no energy drain, the edges wrap, and candy doesn't make you longer. Combos still count.
+- Enter the portal to warp to a **starfield candy stage** for 20 seconds. The board is full of 🍬 🍭 🍩 🧁 and a rare 👑 crown worth 100 points. Candy is worth a flat 10–20 points (no combo or x2 multipliers), so the stage is a bonus rather than a jackpot. There's no poison and no energy drain, the edges wrap, and candy doesn't make you longer.
 - When time runs out you return to your game with your rocks restored and 2 seconds of invulnerability.
 - **Cheat code:** type ↑ ↑ ↓ ↓ ← → ← → B A on the main menu and the portal will open at level 2 in your next game.
 - Two hidden achievements are tied to it.
