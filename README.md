@@ -2,7 +2,7 @@
 
 A modern snake game for the browser that installs as an app and works offline. It has no dependencies and no build step.
 
-**▶ Play:** <https://rhhas-knust.github.io/Snake-game/> · **Publishing to stores:** see [PUBLISHING.md](PUBLISHING.md)
+**▶ Play:** <https://rhhas-knust.github.io/Snake-game/> · **Publishing to stores:** [PUBLISHING.md](PUBLISHING.md) · **Challenge submission kit:** [SUBMISSION.md](SUBMISSION.md)
 
 ## Files
 
