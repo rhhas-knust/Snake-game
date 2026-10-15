@@ -36,6 +36,7 @@ A modern snake game with power-ups, combos, a Daily Challenge, and a secret leve
 >
 > ⚡ **Power-ups:** 🛡️ Shield, ⏳ Slow-mo, 💎 Double points, 🧲 Magnet, ✂️ Shrink.
 > 🔥 **Combos:** chain fruit quickly for up to x8 points.
+> 📱 **Tilt steering:** steer by tilting your phone, with smoothing and a dead zone so it stays steady. Swipe or arrow buttons work too.
 > ☠️ **Poison:** dodge coconuts and eggs. They vanish after a few seconds.
 > 📅 **Daily Challenge:** everyone in the world gets the same board each day. Compare scores with friends.
 > 📤 **Share card:** one tap turns your run into an image for TikTok, Instagram or WhatsApp.
@@ -47,7 +48,7 @@ A modern snake game with power-ups, combos, a Daily Challenge, and a secret leve
 ## Controls
 | | Keyboard | Phone |
 | --- | --- | --- |
-| Move | Arrow keys / WASD | Swipe on the board (🎮 shows arrow buttons) |
+| Move | Arrow keys / WASD | Swipe on the board, or pick 🎮 arrow buttons or 📱 tilt steering |
 | Pause | P / Space / Esc | ⏸ |
 | Share score | S (on game over) | 📤 Share |
 | Mute | M | 🔊 |
