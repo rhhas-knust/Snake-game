@@ -29,15 +29,56 @@ const SKINS = {
   neon:    { name: 'Neon',    head: '#f5d0fe', body: '#d946ef', tail: '#6b21a8' },
   sunset:  { name: 'Sunset',  head: '#fde68a', body: '#f97316', tail: '#991b1b' },
   rainbow: { name: 'Rainbow', head: '#ffffff', body: '#ff0000', tail: '#0000ff', rainbow: true },
+  // Ghana Edition skins: Kente cloth stripes, and the Black Stars (red, gold, green with a black head).
+  kente:      { name: 'Kente', head: '#fcd116', body: '#fcd116', tail: '#006b3f',
+                pattern: ['#fcd116', '#fcd116', '#006b3f', '#fcd116', '#ce1126', '#1f2937'],
+                swatch: 'repeating-linear-gradient(135deg, #fcd116 0 5px, #006b3f 5px 8px, #fcd116 8px 11px, #ce1126 11px 14px, #1f2937 14px 16px)' },
+  blackstars: { name: 'Black Stars', head: '#1f2937', body: '#fcd116', tail: '#006b3f', flag: true,
+                swatch: 'linear-gradient(180deg, #ce1126 0 33%, #fcd116 33% 66%, #006b3f 66%)' },
 };
-const FRUITS = [
-  { id: 'apple',  emoji: '🍎', name: 'Apple',  score: 10, energy: 15, weight: 30, glow: '#ef4444' },
-  { id: 'banana', emoji: '🍌', name: 'Banana', score: 15, energy: 20, weight: 22, glow: '#facc15' },
-  { id: 'orange', emoji: '🍊', name: 'Orange', score: 8,  energy: 10, weight: 30, glow: '#fb923c' },
-  { id: 'grapes', emoji: '🍇', name: 'Grapes', score: 20, energy: 25, weight: 12, glow: '#a855f7' },
-  { id: 'mango',  emoji: '🥭', name: 'Mango',  score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
-];
-const GOLDEN = { id: 'golden', emoji: '🌟', name: 'Golden Star', score: 75, energy: 40, life: 6000, glow: '#fde047' };
+// Worlds. The Ghana Edition swaps in local food, the Black Star, Twi words and Ghanaian colours.
+// Both fruit lists use the same order, points and weights, so a seeded Daily Challenge gives the
+// same tier of fruit at the same moment whichever world a player picked.
+const THEMES = {
+  ghana: {
+    name: 'Ghana',
+    fruits: [
+      { id: 'pineapple', emoji: '🍍', name: 'Pineapple', score: 10, energy: 15, weight: 30, glow: '#facc15' },
+      { id: 'plantain',  emoji: '🍌', name: 'Plantain',  score: 15, energy: 20, weight: 22, glow: '#fde047' },
+      { id: 'groundnut', emoji: '🥜', name: 'Groundnuts', score: 8, energy: 10, weight: 30, glow: '#d6a35c' },
+      { id: 'pear',      emoji: '🥑', name: 'Pear (avocado)', score: 20, energy: 25, weight: 12, glow: '#84cc16' },
+      { id: 'mango',     emoji: '🥭', name: 'Mango',     score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
+    ],
+    golden: { id: 'golden', emoji: '⭐', name: 'Black Star', short: 'Black Star!', score: 75, energy: 40, life: 6000, glow: '#fcd116' },
+    hazards: [
+      { id: 'pepper',   emoji: '🌶️', name: 'Raw Pepper',    glow: '#ef4444', death: 'Too hot! You ate a raw pepper 🌶️' },
+      { id: 'mushroom', emoji: '🍄', name: 'Wild Mushroom', glow: '#ef4444', death: 'You ate a wild mushroom 🍄' },
+    ],
+    // Twi: baako = one, mmienu = two, mmiɛnsa = three, kɔ = go, ayekoo = well done,
+    // due = sorry (sympathy), akwaaba = welcome.
+    words: { count: ['Baako', 'Mmienu', 'Mmiɛnsa'], go: 'KƆ!', goSub: 'Go!', level: 'AYEKOO!', over: 'Due! Game over', hello: 'Akwaaba! 👋' },
+    board: ['#06150f', '#0a2117'],
+  },
+  classic: {
+    name: 'Classic',
+    fruits: [
+      { id: 'apple',  emoji: '🍎', name: 'Apple',  score: 10, energy: 15, weight: 30, glow: '#ef4444' },
+      { id: 'banana', emoji: '🍌', name: 'Banana', score: 15, energy: 20, weight: 22, glow: '#facc15' },
+      { id: 'orange', emoji: '🍊', name: 'Orange', score: 8,  energy: 10, weight: 30, glow: '#fb923c' },
+      { id: 'grapes', emoji: '🍇', name: 'Grapes', score: 20, energy: 25, weight: 12, glow: '#a855f7' },
+      { id: 'mango',  emoji: '🥭', name: 'Mango',  score: 25, energy: 30, weight: 8,  glow: '#f59e0b' },
+    ],
+    golden: { id: 'golden', emoji: '🌟', name: 'Golden Star', short: 'Golden!', score: 75, energy: 40, life: 6000, glow: '#fde047' },
+    hazards: [
+      { id: 'coconut', emoji: '🥥', name: 'Coconut',    glow: '#ef4444' },
+      { id: 'egg',     emoji: '🥚', name: 'Boiled Egg', glow: '#ef4444' },
+    ],
+    words: { count: null, go: 'GO!', goSub: '', level: null, over: 'Game Over', hello: '' },
+    board: ['#070d1f', '#0a1328'],
+  },
+};
+// The active world's items (switched by setTheme).
+let theme = THEMES.ghana, FRUITS = theme.fruits, GOLDEN = theme.golden, HAZARDS = theme.hazards;
 // Secret level: a hidden portal can open after level 4 and leads to a timed candy stage.
 const PORTAL = { id: 'portal', emoji: '🌀', name: 'Secret Portal', life: 10000, glow: '#a855f7' };
 const SECRET_MS = 20000;
@@ -50,10 +91,6 @@ const CANDIES = [
   { id: 'crown',    emoji: '👑', name: 'Crown',    score: 100, energy: 0, weight: 2,  glow: '#fde047' },
 ];
 const KONAMI = ['arrowup', 'arrowup', 'arrowdown', 'arrowdown', 'arrowleft', 'arrowright', 'arrowleft', 'arrowright', 'b', 'a'];
-const HAZARDS = [
-  { id: 'coconut', emoji: '🥥', name: 'Coconut',    glow: '#ef4444' },
-  { id: 'egg',     emoji: '🥚', name: 'Boiled Egg', glow: '#ef4444' },
-];
 const POWERS = {
   shield: { id: 'shield', emoji: '🛡️', name: 'Shield',   color: '#38bdf8', desc: 'Survive one fatal hit' },
   slow:   { id: 'slow',   emoji: '⏳', name: 'Slow-mo',  color: '#a78bfa', desc: 'Slows the game down', dur: 7000 },
@@ -69,7 +106,7 @@ const ACHIEVEMENTS = [
   { id: 'len50',   icon: '🐉', name: 'Dragon',      desc: 'Grow to length 50',           test: g => g.length >= 50 },
   { id: 'lvl5',    icon: '🚀', name: 'Speedster',   desc: 'Reach level 5',               test: g => g.level >= 5 },
   { id: 'lvl10',   icon: '🏆', name: 'Master',      desc: 'Reach level 10',              test: g => g.level >= 10 },
-  { id: 'golden',  icon: '🌟', name: 'Gold Digger', desc: 'Eat a golden star',           test: g => g.golden >= 1 },
+  { id: 'golden',  icon: '🌟', name: 'Gold Digger', desc: 'Eat a ⭐ star bonus',           test: g => g.golden >= 1 },
   { id: 'shield',  icon: '🛡️', name: 'Close Call',  desc: 'Get saved by a shield',       test: g => g.shieldSaved },
   { id: 's500',    icon: '💯', name: 'High Roller', desc: 'Score 500 in one game',       test: g => g.score >= 500 },
   { id: 's2000',   icon: '👑', name: 'Legend',      desc: 'Score 2000 in one game',      test: g => g.score >= 2000 },
@@ -107,7 +144,9 @@ function loadSave() {
     settings: {
       mode: MODES[rs.mode] ? rs.mode : 'classic',
       diff: DIFFS[rs.diff] ? rs.diff : 'medium',
-      skin: SKINS[rs.skin] ? rs.skin : 'emerald',
+      skin: SKINS[rs.skin] ? rs.skin : 'kente',
+      theme: THEMES[rs.theme] ? rs.theme : 'ghana',
+      music: rs.music !== false,
       sound: rs.sound !== false,
       // How to steer on touch screens. Older saves had a plain on/off arrow-pad flag.
       control: ['swipe', 'pad', 'tilt'].includes(rs.control) ? rs.control : (rs.dpad === true ? 'pad' : 'swipe'),
@@ -190,6 +229,59 @@ const sfx = {
   portal()   { tone(330, .6, 'sine', .25, 0, 990); },
   poof()     { tone(220, .12, 'triangle', .15, 0, 110); },
 };
+// ---------- Music ----------
+// An original loop in the style of Ghanaian highlife and palm-wine music, built on the West
+// African 12-pulse bell timeline (x.x.xx.x.x.x). Everything is synthesised live, so there are
+// no audio files to download. The tempo rises with the level and drops in Slow-mo.
+const BELL = [1, 0, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1];
+const CHORDS = [[261.63, 329.63, 392.0], [349.23, 440.0, 523.25], [392.0, 493.88, 587.33], [349.23, 440.0, 523.25]];  // C F G F
+const BASS = [65.41, 87.31, 98.0, 87.31];
+const GUITAR = { 0: 0, 2: 1, 3: 2, 5: 1, 6: 0, 8: 2, 10: 1, 11: 2 };   // pulse → chord tone ("picked" pattern)
+const music = { timer: null, next: 0, pulse: 0, gain: null, noise: null };
+const musicWanted = () => save.settings.sound && save.settings.music && (state === 'playing' || state === 'countdown');
+function musicNote(c, freq, t, dur, type, vol) {
+  const o = c.createOscillator(), g = c.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g); g.connect(music.gain);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function musicShaker(c, t, vol) {
+  if (!music.noise) {
+    const len = Math.floor(c.sampleRate * 0.05), buf = c.createBuffer(1, len, c.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    music.noise = buf;
+  }
+  const src = c.createBufferSource(), hp = c.createBiquadFilter(), g = c.createGain();
+  src.buffer = music.noise; hp.type = 'highpass'; hp.frequency.value = 6000;
+  g.gain.setValueAtTime(vol, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.045);
+  src.connect(hp); hp.connect(g); g.connect(music.gain);
+  src.start(t); src.stop(t + 0.05);
+}
+function musicTick() {
+  if (!musicWanted()) { stopMusic(); return; }
+  const c = ac(); if (!c) return;
+  if (!music.gain) { music.gain = c.createGain(); music.gain.gain.value = 0.55; music.gain.connect(audio.master); }
+  const slow = effects && effects.slow > gameTime;
+  const bpm = Math.min(118, 88 + (level - 1) * 3) * (slow ? 0.8 : 1);   // dotted-quarter beats per minute
+  const pulse = 60 / bpm / 3;
+  if (music.next < c.currentTime) music.next = c.currentTime + 0.05;
+  // Schedule a little ahead of time so timer jitter never makes the groove stumble.
+  while (music.next < c.currentTime + 0.25) {
+    const p = music.pulse % 12, bar = Math.floor(music.pulse / 12) % 4, t = music.next;
+    if (BELL[p]) musicNote(c, secret ? 2093 : 1568, t, 0.09, 'square', 0.045);
+    musicShaker(c, t, p % 3 === 0 ? 0.05 : 0.025);
+    if (p === 0 || p === 6) musicNote(c, BASS[bar], t, pulse * 2.6, 'triangle', 0.32);
+    if (p === 9) musicNote(c, BASS[bar] * 1.5, t, pulse * 1.6, 'triangle', 0.22);
+    if (p in GUITAR) musicNote(c, CHORDS[bar][GUITAR[p]] * (p >= 6 ? 2 : 1), t, pulse * 1.8, 'triangle', 0.09);
+    music.next += pulse; music.pulse++;
+  }
+}
+function startMusic() { if (!music.timer && musicWanted()) { music.timer = setInterval(musicTick, 60); musicTick(); } }
+function stopMusic() { if (music.timer) { clearInterval(music.timer); music.timer = null; music.next = 0; } }
+
 const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
 // Respects the system "reduce motion" setting: no screen shake, a much fainter hit flash.
 const motionMQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
@@ -270,6 +362,7 @@ function setupGame(daily = false) {
   }
   streamCounters = {};
   mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
+  setTheme(save.settings.theme);
   snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
   prevSnake = snake.map(s => ({ ...s }));
   dir = R; queue = [];
@@ -294,8 +387,16 @@ function setupGame(daily = false) {
   wrapEl.dataset.mode = modeId;
 }
 
+function setTheme(id) {
+  const changed = theme !== THEMES[id];
+  theme = THEMES[id]; FRUITS = theme.fruits; GOLDEN = theme.golden; HAZARDS = theme.hazards;
+  document.body.dataset.theme = id;
+  if (changed && W) buildBg();
+}
+
 function startGame(daily = false) {
   gameId++;
+  stopMusic(); music.pulse = 0;
   if (tiltOn() && !tilt.listening) enableTilt(true);
   tilt.held = null;
   setupGame(daily);
@@ -364,7 +465,7 @@ function spawnGolden() {
   const c = randomFree(nextStream('golden'), 4);
   if (!c) return;
   items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
-  floater(c.x + .5, c.y - .2, 'Golden!', GOLDEN.glow, .45);
+  floater(c.x + .5, c.y - .2, GOLDEN.short, GOLDEN.glow, .45);
 }
 function spawnHazard() {
   const max = Math.min(4, 1 + Math.floor(level / 3));
@@ -453,7 +554,7 @@ function consume(item) {
     if (isGhost()) {
       burst(cx, cy, '#94a3b8', 10); floater(cx, cy - .2, 'Blocked!', '#94a3b8', .4); sfx.poof();
     } else if (!useShield()) {
-      return die(`You ate a poisonous ${t.name.toLowerCase()} ${t.emoji}`);
+      return die(t.death || `You ate a poisonous ${t.name.toLowerCase()} ${t.emoji}`);
     }
   } else if (item.kind === 'power') {
     applyPower(t, cx, cy);
@@ -588,7 +689,9 @@ function levelUp() {
     }
     sub = 'New rocks appeared!';
   }
-  banner = { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
+  banner = theme.words.level
+    ? { text: theme.words.level, sub: `Level ${level} · ${sub}`, t: 0, dur: 1500 }
+    : { text: `LEVEL ${level}`, sub, t: 0, dur: 1500 };
   announce(`Level ${level}. ${sub}`);
   // The portal opens at most once per game: 40% chance from level 4, guaranteed at level 6.
   // The cheat code is ignored in the Daily Challenge so it stays fair for everyone.
@@ -658,7 +761,7 @@ function update(dt) {
     const after = Math.ceil(countdownMs / COUNT_STEP);
     if (countdownMs <= 0) {
       state = 'playing';
-      banner = { text: 'GO!', sub: '', t: 0, dur: 700 };
+      banner = { text: theme.words.go, sub: theme.words.goSub, t: 0, dur: 800 };
       sfx.count(true);
       announce(`Go! ${isDaily ? 'Daily Challenge, ' : ''}${mode.name} mode.`);
     } else if (after !== before) sfx.count(false);
@@ -770,8 +873,8 @@ function layout() {
 function buildBg() {
   bg.width = canvas.width; bg.height = canvas.height;
   const c = bg.getContext('2d'), w = bg.width, cs = w / COLS;
-  c.fillStyle = '#070d1f'; c.fillRect(0, 0, w, w);
-  c.fillStyle = '#0a1328';
+  c.fillStyle = theme.board[0]; c.fillRect(0, 0, w, w);
+  c.fillStyle = theme.board[1];
   for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
     if ((x + y) % 2) c.fillRect(Math.floor(x * cs), Math.floor(y * cs), Math.ceil(cs), Math.ceil(cs));
   }
@@ -810,6 +913,8 @@ function rockSprite() {
 function snakeColor(i, n, now) {
   const t = n > 1 ? i / (n - 1) : 0;
   if (skin.rainbow) return `hsl(${(((i * 14 - now * .08) % 360) + 360) % 360},85%,${60 - t * 12}%)`;
+  if (skin.pattern) return skin.pattern[i % skin.pattern.length];            // Kente stripes
+  if (skin.flag) return t < 1 / 3 ? '#ce1126' : t < 2 / 3 ? '#fcd116' : '#006b3f';   // Ghana flag
   return mixHex(skin.body, skin.tail, t);
 }
 
@@ -1061,15 +1166,20 @@ function drawCountdown() {
   ctx.font = `900 ${Math.round(W * .22)}px system-ui, sans-serif`;
   ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(2,6,23,.8)'; ctx.strokeText(n, 0, 0);
   ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 0);
+  if (theme.words.count) {
+    ctx.font = `800 ${Math.round(W * .055)}px system-ui, sans-serif`;
+    ctx.lineWidth = 5; ctx.strokeText(theme.words.count[n - 1], 0, W * .16);
+    ctx.fillStyle = '#fcd116'; ctx.fillText(theme.words.count[n - 1], 0, W * .16);
+  }
   ctx.restore();
   ctx.textAlign = 'center';
   ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
   ctx.fillStyle = '#cbd5e1';
-  ctx.fillText(isDaily ? `📅 Daily #${dailyNumber()} · ${mode.name}` : `${mode.name} · ${diff.name}`, W / 2, W * .68);
+  ctx.fillText((isDaily ? `📅 Daily #${dailyNumber()} · ${mode.name}` : `${mode.name} · ${diff.name}`) + (theme === THEMES.ghana ? ' · Ghana Edition' : ''), W / 2, W * .72);
   const hint = save.settings.control === 'tilt' ? '📱 Hold steady… then tilt to steer'
     : save.settings.control === 'pad' ? '🎮 Use the arrow buttons (or swipe)'
     : coarseMQ.matches ? '👆 Swipe on the board to steer' : '';
-  if (hint) { ctx.fillStyle = '#fde047'; ctx.fillText(hint, W / 2, W * .76); }
+  if (hint) { ctx.fillStyle = '#fde047'; ctx.fillText(hint, W / 2, W * .79); }
 }
 
 // ================================================================
@@ -1127,7 +1237,7 @@ function updateHud() {
     el.chips.innerHTML = chips.map(([t, c]) => `<span class="chip" style="--c:${c}">${t}</span>`).join('');
   }, sig);
 
-  setStyle('playing', v => { document.body.classList.toggle('playing', v); updateWakeLock(); }, state === 'playing' || state === 'countdown');
+  setStyle('playing', v => { document.body.classList.toggle('playing', v); updateWakeLock(); if (v) startMusic(); else stopMusic(); }, state === 'playing' || state === 'countdown');
   const canPause = state === 'playing' || state === 'countdown' || state === 'paused';
   setStyle('pauseIcon', v => el.pauseBtn.textContent = v, state === 'paused' ? '▶' : '⏸');
   setStyle('pauseDis', v => el.pauseBtn.disabled = v, !canPause);
@@ -1143,7 +1253,7 @@ function showScreen(id) {
 }
 
 function showOver() {
-  $('overTitle').textContent = isWin ? '🎉 You Win!' : 'Game Over';
+  $('overTitle').textContent = isWin ? '🎉 You Win!' : theme.words.over;
   $('overTitle').className = 'ov-title ' + (isWin ? 'win' : 'bad');
   $('overReason').textContent = deathReason;
   $('finalScore').textContent = score;
@@ -1203,8 +1313,10 @@ function buildShareCard() {
   g.fillStyle = tg; g.fillText('🐍 SNAKE PRO', Wc / 2, 150);
 
   // Mode pill.
-  const pill = isDaily ? `📅 DAILY CHALLENGE #${dailyNumber()}` : `${mode.name.toUpperCase()} · ${diff.name.toUpperCase()}`;
+  const pill = (isDaily ? `📅 DAILY CHALLENGE #${dailyNumber()}` : `${mode.name.toUpperCase()} · ${diff.name.toUpperCase()}`) +
+    (theme === THEMES.ghana ? ' · GHANA EDITION' : '');
   g.font = font(800, 44);
+  if (g.measureText(pill).width > 900) g.font = font(800, Math.floor(44 * 900 / g.measureText(pill).width));
   const pw = g.measureText(pill).width + 80;
   g.fillStyle = isDaily ? '#f59e0b' : 'rgba(255,255,255,.1)';
   rr(g, Wc / 2 - pw / 2, 225, pw, 80, 40); g.fill();
@@ -1314,12 +1426,16 @@ function resume() {
 // ---------- Menu ----------
 function buildMenu() {
   const s = save.settings;
+  $('themes').innerHTML = Object.entries(THEMES).map(([id, t]) =>
+    `<button class="${id === s.theme ? 'sel' : ''}" data-theme="${id}">${id === 'ghana' ? '<span class="flag-gh" aria-hidden="true"></span> Ghana Edition' : t.name}</button>`).join('');
+  $('hello').textContent = THEMES[s.theme].words.hello;
+  $('hello').classList.toggle('hidden', !THEMES[s.theme].words.hello);
   $('modes').innerHTML = Object.entries(MODES).map(([id, m]) =>
     `<button class="mode${id === s.mode ? ' sel' : ''}" data-mode="${id}"><span class="ic">${m.icon}</span><span><b>${m.name}</b><small>${m.desc}</small></span></button>`).join('');
   $('diffs').innerHTML = Object.entries(DIFFS).map(([id, d]) =>
     `<button class="${id === s.diff ? 'sel' : ''}" data-diff="${id}">${d.name}</button>`).join('');
   $('skins').innerHTML = Object.entries(SKINS).map(([id, k]) => {
-    const sw = k.rainbow ? 'conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#8b5cf6,#f43f5e)' : `linear-gradient(135deg, ${k.head}, ${k.body} 55%, ${k.tail})`;
+    const sw = k.swatch || (k.rainbow ? 'conic-gradient(#f43f5e,#f59e0b,#84cc16,#22d3ee,#8b5cf6,#f43f5e)' : `linear-gradient(135deg, ${k.head}, ${k.body} 55%, ${k.tail})`);
     return `<button class="skin${id === s.skin ? ' sel' : ''}" data-skin="${id}" title="${k.name}" aria-label="${k.name} skin" style="--sw:${sw}"></button>`;
   }).join('');
   const b = save.bests[menuBestKey()] || 0;
@@ -1341,12 +1457,20 @@ function buildAchievements() {
 }
 $('menu').addEventListener('click', e => {
   const m = e.target.closest('button[data-mode]'), d = e.target.closest('button[data-diff]'), k = e.target.closest('button[data-skin]');
-  if (!m && !d && !k) return;
+  const w = e.target.closest('button[data-theme]');
+  if (!m && !d && !k && !w) return;
+  if (w) {
+    save.settings.theme = w.dataset.theme;
+    // Switching world also switches to that world's signature skin.
+    if (w.dataset.theme === 'ghana' && !SKINS[save.settings.skin].pattern && !SKINS[save.settings.skin].flag) save.settings.skin = 'kente';
+    if (w.dataset.theme === 'classic' && (SKINS[save.settings.skin].pattern || SKINS[save.settings.skin].flag)) save.settings.skin = 'emerald';
+  }
   if (m) save.settings.mode = m.dataset.mode;
   if (d) save.settings.diff = d.dataset.diff;
   if (k) save.settings.skin = k.dataset.skin;
   persist(); sfx.click();
   setupGame(); buildMenu();
+  if (w) buildHelp();
 });
 
 // ---------- How-to-play panel content (built from the game data so it never goes stale) ----------
@@ -1369,6 +1493,14 @@ function buildHelp() {
     </div></div>
     <div class="item-group"><h3>Daily Challenge</h3><div class="item-list mode-list">
       ${item('gold', '📅', 'Same board for everyone', 'A new challenge every day on Medium difficulty. Fruit, poison and power-ups appear in the same order for every player, so scores are fair to compare.')}
+    </div></div>
+    <div class="item-group"><h3>Ghana Edition: Twi words in the game</h3><div class="item-list">
+      ${item('gold', '👋', 'Akwaaba', 'Welcome')}
+      ${item('gold', '🎉', 'Ayekoo!', 'Well done (level up)')}
+      ${item('gold', '3️⃣', 'Mmiɛnsa · Mmienu · Baako', 'Three · two · one')}
+      ${item('gold', '🏁', 'Kɔ!', 'Go!')}
+      ${item('gold', '😔', 'Due!', 'Sorry (game over)')}
+      ${item('gold', '⭐', 'Black Star', 'The star on the Ghana flag: +75 bonus')}
     </div></div>
     <div class="item-group"><h3>Difficulty</h3><div class="item-list mode-list">
       ${item('', '⚡', Object.values(DIFFS).map(d => d.name).join(' · '), 'Harder levels start faster and drain energy quicker. Every level makes the snake faster.')}
@@ -1409,6 +1541,7 @@ function queueDir(nd) {
 function toggleSound() {
   save.settings.sound = !save.settings.sound;
   persist();
+  if (save.settings.sound) startMusic(); else stopMusic();
   if (save.settings.sound) sfx.click();
 }
 
@@ -1589,6 +1722,16 @@ document.querySelectorAll('#sensSeg button').forEach(b => b.addEventListener('cl
   persist();
   applyControl();
 }));
+function updateMusicBtn() {
+  const b = $('musicBtn');
+  b.textContent = save.settings.music ? '🎵 Music: On' : '🎵 Music: Off';
+  b.setAttribute('aria-pressed', String(save.settings.music));
+}
+$('musicBtn').addEventListener('click', () => {
+  save.settings.music = !save.settings.music;
+  persist(); sfx.click(); updateMusicBtn();
+});
+updateMusicBtn();
 $('recenterBtn').addEventListener('click', () => {
   sfx.click();
   if (tilt.rawX != null) { tilt.cx = tilt.rawX; tilt.cy = tilt.rawY; tilt.x = tilt.y = 0; tilt.held = null; }
