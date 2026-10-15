@@ -37,8 +37,10 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 - **5 snake skins**, including an animated rainbow skin.
 - **15 achievements** (2 hidden) and lifetime stats.
 - Smooth, interpolated movement at the display's refresh rate, with particles, screen shake, and sound effects synthesized with WebAudio.
-- Keyboard and swipe controls, plus an optional on-screen arrow pad (🎮 button, off by default) and a 3-move input buffer so quick turns aren't dropped.
-- **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button where the browser supports it, and the page doesn't scroll while you swipe.
+- **Controls (🎮 button):** 👆 swipe (default), 🎮 on-screen arrow buttons, or 📱 **tilt steering** using the phone's motion sensor. Swipe always works alongside the other two, and the keyboard always works on a computer. A 3-move input buffer means quick turns aren't dropped.
+- **Steady tilt steering:** readings are smoothed and there's a dead zone, so hand wobble never turns the snake. A turn needs one direction to clearly win (no flicker on diagonals) and you have to ease back before the same turn fires again. Centre is set from how you hold the phone during the 3-2-1, there are three sensitivity levels and a 🎯 Recenter button, and the screen stays awake while you tilt.
+- **Clean home page:** help (❓, with Basics / Items / Modes tabs) and controls (🎮) open as pop-up panels from the top bar instead of filling the page.
+- **Phone-friendly layout**: the board is sized to fill the screen, menus scale to fit the board, the phone can be held sideways (board on the left, HUD on the right), there's a ⛶ fullscreen button (in the 🎮 panel) where the browser supports it, and the page doesn't scroll while you swipe.
 - Crisp rendering on HiDPI screens and auto-pause when you switch tabs.
 - **Accessible**: screen-reader announcements for game start, level-ups, the secret level and game over; menus are proper dialogs that move keyboard focus to their main button; the system *reduce motion* setting turns off screen shake, flashing and blinking.
 - **Installable app (PWA)**: 📲 Install button (Android and desktop) or *Add to Home Screen* (iPhone). It gets its own icon, opens full screen and plays offline.
@@ -53,8 +55,9 @@ To run it locally, serve the folder over HTTP (for example `python3 -m http.serv
 
 | Action | Keyboard | Touch |
 | --- | --- | --- |
-| Move | Arrow keys / WASD | Swipe on the board (or turn on the 🎮 arrow pad) |
-| Fullscreen | | ⛶ button (Android / desktop) |
+| Move | Arrow keys / WASD | Swipe on the board, or pick 🎮 Arrow buttons / 📱 Tilt |
+| How to play | | ❓ button |
+| Fullscreen | | 🎮 panel → ⛶ (Android / desktop) |
 | Pause / resume | P, Space, Esc | ⏸ button |
 | Start / replay | Enter | Buttons |
 | Share score (game-over screen) | S | 📤 Share button |

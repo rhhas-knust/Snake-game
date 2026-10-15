@@ -109,7 +109,9 @@ function loadSave() {
       diff: DIFFS[rs.diff] ? rs.diff : 'medium',
       skin: SKINS[rs.skin] ? rs.skin : 'emerald',
       sound: rs.sound !== false,
-      dpad: rs.dpad === true,
+      // How to steer on touch screens. Older saves had a plain on/off arrow-pad flag.
+      control: ['swipe', 'pad', 'tilt'].includes(rs.control) ? rs.control : (rs.dpad === true ? 'pad' : 'swipe'),
+      sens: ['low', 'normal', 'high'].includes(rs.sens) ? rs.sens : 'normal',
     },
     stats: { games: num(rt.games), fruits: num(rt.fruits), bestLength: num(rt.bestLength), playMs: num(rt.playMs), secrets: num(rt.secrets) },
     achievements,
@@ -294,6 +296,8 @@ function setupGame(daily = false) {
 
 function startGame(daily = false) {
   gameId++;
+  if (tiltOn() && !tilt.listening) enableTilt(true);
+  tilt.held = null;
   setupGame(daily);
   showScreen(null);
   if (window.scrollY > 0) window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -829,6 +833,7 @@ function render(now) {
   }
   drawBanner();
   if (state === 'countdown') drawCountdown();
+  if (tiltOn() && tilt.seen && (state === 'playing' || state === 'countdown')) drawTiltIndicator();
 }
 
 const STARS = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: frand(.4, 1.6), p: frand(0, 6.28), s: frand(.6, 2) }));
@@ -1061,10 +1066,10 @@ function drawCountdown() {
   ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
   ctx.fillStyle = '#cbd5e1';
   ctx.fillText(isDaily ? `📅 Daily #${dailyNumber()} · ${mode.name}` : `${mode.name} · ${diff.name}`, W / 2, W * .68);
-  if (coarseMQ.matches && !document.body.classList.contains('pad-on')) {
-    ctx.fillStyle = '#fde047';
-    ctx.fillText('👆 Swipe on the board to steer', W / 2, W * .76);
-  }
+  const hint = save.settings.control === 'tilt' ? '📱 Hold steady… then tilt to steer'
+    : save.settings.control === 'pad' ? '🎮 Use the arrow buttons (or swipe)'
+    : coarseMQ.matches ? '👆 Swipe on the board to steer' : '';
+  if (hint) { ctx.fillStyle = '#fde047'; ctx.fillText(hint, W / 2, W * .76); }
 }
 
 // ================================================================
@@ -1122,7 +1127,7 @@ function updateHud() {
     el.chips.innerHTML = chips.map(([t, c]) => `<span class="chip" style="--c:${c}">${t}</span>`).join('');
   }, sig);
 
-  setStyle('playing', v => document.body.classList.toggle('playing', v), state === 'playing' || state === 'countdown');
+  setStyle('playing', v => { document.body.classList.toggle('playing', v); updateWakeLock(); }, state === 'playing' || state === 'countdown');
   const canPause = state === 'playing' || state === 'countdown' || state === 'paused';
   setStyle('pauseIcon', v => el.pauseBtn.textContent = v, state === 'paused' ? '▶' : '⏸');
   setStyle('pauseDis', v => el.pauseBtn.disabled = v, !canPause);
@@ -1344,11 +1349,30 @@ $('menu').addEventListener('click', e => {
   setupGame(); buildMenu();
 });
 
-function buildLegend() {
-  $('legend').innerHTML = `
-    <div class="lg-group"><h3>Fruit · points</h3>${FRUITS.map(f => `<span title="${f.name}: +${f.energy}% energy">${f.emoji} +${f.score}</span>`).join('')}<span class="gold" title="Rare, disappears quickly">${GOLDEN.emoji} +${GOLDEN.score}</span></div>
-    <div class="lg-group"><h3>Poison</h3>${HAZARDS.map(h => `<span class="bad" title="${h.name}">${h.emoji} ☠</span>`).join('')}</div>
-    <div class="lg-group"><h3>Power-ups</h3>${Object.values(POWERS).map(p => `<span title="${p.desc}">${p.emoji} ${p.name}</span>`).join('')}</div>`;
+// ---------- How-to-play panel content (built from the game data so it never goes stale) ----------
+function buildHelp() {
+  const item = (cls, ic, title, text) => `<div class="item ${cls}"><span class="ic">${ic}</span><span><b>${title}</b>${text}</span></div>`;
+  $('pane-items').innerHTML = `
+    <div class="item-group"><h3>Fruit: points &amp; energy</h3><div class="item-list">
+      ${FRUITS.map(f => item('', f.emoji, `${f.name} +${f.score}`, `+${f.energy}% energy`)).join('')}
+      ${item('gold', GOLDEN.emoji, `${GOLDEN.name} +${GOLDEN.score}`, 'Rare, vanishes fast')}
+    </div></div>
+    <div class="item-group"><h3>Poison: avoid it!</h3><div class="item-list">
+      ${HAZARDS.map(h => item('bad', h.emoji, h.name, 'Game over if eaten. Disappears after a few seconds.')).join('')}
+    </div></div>
+    <div class="item-group"><h3>Power-ups</h3><div class="item-list">
+      ${Object.values(POWERS).map(p => item('', p.emoji, p.name, p.desc + (p.dur ? ` for ${p.dur / 1000}s` : ''))).join('')}
+    </div></div>`;
+  $('pane-modes').innerHTML = `
+    <div class="item-group"><h3>Game modes</h3><div class="item-list mode-list">
+      ${Object.values(MODES).map(m => item('', m.icon, m.name, m.desc)).join('')}
+    </div></div>
+    <div class="item-group"><h3>Daily Challenge</h3><div class="item-list mode-list">
+      ${item('gold', '📅', 'Same board for everyone', 'A new challenge every day on Medium difficulty. Fruit, poison and power-ups appear in the same order for every player, so scores are fair to compare.')}
+    </div></div>
+    <div class="item-group"><h3>Difficulty</h3><div class="item-list mode-list">
+      ${item('', '⚡', Object.values(DIFFS).map(d => d.name).join(' · '), 'Harder levels start faster and drain energy quicker. Every level makes the snake faster.')}
+    </div></div>`;
 }
 
 // ---------- Toasts ----------
@@ -1375,10 +1399,12 @@ function nextToast() {
 // Input
 // ================================================================
 function queueDir(nd) {
-  if (state !== 'playing' && state !== 'countdown') return;
+  if (state !== 'playing' && state !== 'countdown') return false;
   const last = queue.length ? queue[queue.length - 1] : dir;
-  if (nd === last || (nd.x === -last.x && nd.y === -last.y)) return;
-  if (queue.length < 3) queue.push(nd);
+  if (nd === last || (nd.x === -last.x && nd.y === -last.y)) return false;
+  if (queue.length >= 3) return false;
+  queue.push(nd);
+  return true;
 }
 function toggleSound() {
   save.settings.sound = !save.settings.sound;
@@ -1390,6 +1416,10 @@ const KEYMAP = { arrowup: U, w: U, arrowdown: D, s: D, arrowleft: L, a: L, arrow
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
   const k = e.key.toLowerCase();
+  if (openSheetEl) {   // a panel is open: Esc closes it, game keys are ignored
+    if (k === 'escape') { e.preventDefault(); closeSheet(); }
+    return;
+  }
   // Let a focused button handle its own Enter/Space.
   if ((k === 'enter' || k === ' ') && e.target.closest && e.target.closest('button')) return;
 
@@ -1468,21 +1498,219 @@ document.addEventListener('click', e => { const b = e.target.closest('button'); 
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 
-// Arrow pad: off by default (swipe is the main touch control), remembered once turned on.
-const padBtn = $('padBtn'), fsBtn = $('fsBtn');
-function applyPad() {
-  const on = !!save.settings.dpad && coarseMQ.matches;
-  document.body.classList.toggle('pad-on', on);
-  padBtn.classList.toggle('on', on);
-  padBtn.setAttribute('aria-pressed', String(on));
+// ---------- Pop-up panels ("sheets") opened from the top bar ----------
+const backdrop = $('sheetBackdrop');
+let openSheetEl = null;
+function openSheet(id) {
+  if (state === 'playing' || state === 'countdown') pause();   // never let the snake run behind a panel
+  closeSheet(false);
+  openSheetEl = $(id);
+  backdrop.classList.remove('hidden');
+  openSheetEl.classList.remove('hidden');
+  openSheetEl.querySelector('[data-close]').focus({ preventScroll: true });
+}
+function closeSheet(restoreFocus = true) {
+  if (!openSheetEl) return;
+  openSheetEl.classList.add('hidden');
+  backdrop.classList.add('hidden');
+  openSheetEl = null;
+  // Hand focus back to the main button of whatever is on the board (Resume, Play...).
+  const shown = [el.menu, el.pauseScreen, el.overScreen, el.achScreen].find(o => !o.classList.contains('hidden'));
+  if (restoreFocus && shown) $(SCREEN_FOCUS[shown.id]).focus({ preventScroll: true });
+}
+backdrop.addEventListener('click', () => closeSheet());
+document.querySelectorAll('.sheet [data-close]').forEach(b => b.addEventListener('click', () => closeSheet()));
+$('helpBtn').addEventListener('click', () => { sfx.click(); openSheet('helpSheet'); });
+$('ctrlBtn').addEventListener('click', () => { sfx.click(); openSheet('ctrlSheet'); });
+
+// Help tabs (Basics / Items / Modes), with arrow-key support.
+const helpTabs = [...document.querySelectorAll('#helpSheet [role="tab"]')];
+function selectTab(tab) {
+  for (const t of helpTabs) {
+    const on = t === tab;
+    t.setAttribute('aria-selected', String(on));
+    t.tabIndex = on ? 0 : -1;
+    $(t.getAttribute('aria-controls')).classList.toggle('hidden', !on);
+  }
+}
+helpTabs.forEach((t, i) => {
+  t.addEventListener('click', () => selectTab(t));
+  t.addEventListener('keydown', e => {
+    const step = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+    if (!step) return;
+    const next = helpTabs[(i + step + helpTabs.length) % helpTabs.length];
+    selectTab(next); next.focus();
+  });
+});
+selectTab(helpTabs[0]);
+
+// ---------- Controls: swipe (default), arrow buttons, or tilt. Swipe always works. ----------
+const ctrlOpts = [...document.querySelectorAll('.ctrl-opt')];
+function applyControl() {
+  const c = save.settings.control;
+  document.body.classList.toggle('pad-on', c === 'pad');
+  for (const o of ctrlOpts) o.setAttribute('aria-checked', String(o.dataset.control === c));
+  $('tiltPanel').classList.toggle('hidden', c !== 'tilt');
+  document.querySelectorAll('#sensSeg button').forEach(b => b.classList.toggle('sel', b.dataset.sens === save.settings.sens));
+  if (c !== 'tilt') disableTilt();
+  updateWakeLock();
   layout();
 }
-padBtn.addEventListener('click', () => {
-  save.settings.dpad = !save.settings.dpad;
-  persist(); sfx.click();
-  applyPad();
-  toast(save.settings.dpad ? '🎮 Arrow buttons on' : '👆 Arrow buttons off: swipe on the board');
+function setControl(c) {
+  save.settings.control = c;
+  persist();
+  applyControl();
+}
+ctrlOpts.forEach(o => o.addEventListener('click', async () => {
+  sfx.click();
+  const c = o.dataset.control;
+  if (c === 'tilt') {
+    const ok = await enableTilt(true);
+    if (!ok) {
+      toast(tiltNeedsPermission ? '📱 Tilt needs motion access. Tap Tilt again and choose Allow.' : "📱 Tilt isn't available on this device", 3500);
+      return;
+    }
+    tilt.seen = false; tilt.cx = null;
+    // Some phones expose the API but no sensor: fall back to swipe if no readings arrive.
+    setTimeout(() => {
+      if (save.settings.control === 'tilt' && !tilt.seen) {
+        toast('📱 No motion sensor found, so swipe stays on', 3500);
+        setControl('swipe');
+      }
+    }, 1500);
+  }
+  setControl(c);
+  // The panel shows the choice; screen-reader users get it read out.
+  announce(c === 'tilt' ? 'Tilt steering on. Swipe still works too.' : c === 'pad' ? 'Arrow buttons on. Swipe still works too.' : 'Swipe steering on.');
+}));
+document.querySelectorAll('#sensSeg button').forEach(b => b.addEventListener('click', () => {
+  sfx.click();
+  save.settings.sens = b.dataset.sens;
+  persist();
+  applyControl();
+}));
+$('recenterBtn').addEventListener('click', () => {
+  sfx.click();
+  if (tilt.rawX != null) { tilt.cx = tilt.rawX; tilt.cy = tilt.rawY; tilt.x = tilt.y = 0; tilt.held = null; }
+  toast('🎯 Centred on how you are holding the phone');
 });
+
+// ---------- Tilt ("gravity") steering ----------
+// Stability measures: the reading is smoothed, there's a dead zone around "centre" that small
+// wobbles never leave, a turn needs one axis to clearly dominate the other (no flicker on
+// diagonals), a tilt must ease back before it can fire the same turn again (hysteresis), turns
+// are rate-limited, and "centre" is re-learned during the countdown and whenever the game isn't running.
+const TILT_SENS = { low: { on: 18, off: 11 }, normal: { on: 13, off: 8 }, high: { on: 9, off: 5 } };  // degrees
+const TILT_MAX = 30;   // tilt that reaches the edge of the on-screen indicator
+const tilt = { listening: false, seen: false, permission: null, rawX: null, rawY: null, cx: null, cy: null, x: 0, y: 0, held: null, lastTurn: 0 };
+const tiltSupported = typeof window.DeviceOrientationEvent !== 'undefined';
+const tiltNeedsPermission = tiltSupported && typeof DeviceOrientationEvent.requestPermission === 'function';
+const tiltOn = () => save.settings.control === 'tilt';
+if (!tiltSupported || !coarseMQ.matches) {
+  const opt = ctrlOpts.find(o => o.dataset.control === 'tilt');
+  opt.disabled = true;
+  $('tiltDesc').textContent = 'Needs a phone or tablet with a motion sensor.';
+}
+
+// Converts device tilt into screen directions, whichever way the phone is turned.
+function screenTilt(gamma, beta) {
+  const angle = ((((screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0) % 360) + 360) % 360;
+  switch (angle) {
+    case 90: return [beta, -gamma];
+    case 180: return [-gamma, -beta];
+    case 270: return [-beta, gamma];
+    default: return [gamma, beta];
+  }
+}
+function onOrient(e) {
+  if (e.beta == null || e.gamma == null) return;
+  tilt.seen = true;
+  // Held almost vertically, the left/right reading becomes unreliable: keep the last good one.
+  const upright = Math.abs(e.beta) > 80;
+  const [sx, sy] = screenTilt(upright ? 0 : e.gamma, e.beta);
+  const rx = upright && tilt.rawX != null ? tilt.rawX : sx;
+  tilt.rawX = rx; tilt.rawY = sy;
+  if (tilt.cx == null) { tilt.cx = rx; tilt.cy = sy; }
+  if (state !== 'playing') {
+    // Not steering right now: quietly follow how the phone is held, so that becomes "centre".
+    tilt.cx += (rx - tilt.cx) * .15; tilt.cy += (sy - tilt.cy) * .15;
+    tilt.held = null;
+  }
+  tilt.x += ((rx - tilt.cx) - tilt.x) * .3;
+  tilt.y += ((sy - tilt.cy) - tilt.y) * .3;
+  if (state === 'playing' && tiltOn()) steerByTilt();
+}
+function steerByTilt() {
+  const { on, off } = TILT_SENS[save.settings.sens];
+  if (tilt.held) {
+    const along = { left: -tilt.x, right: tilt.x, up: -tilt.y, down: tilt.y }[tilt.held];
+    if (along < off) tilt.held = null;     // eased back toward centre: the same turn can fire again
+  }
+  const ax = Math.abs(tilt.x), ay = Math.abs(tilt.y);
+  let want = null;
+  if (ax >= on && ax >= ay * 1.25) want = tilt.x > 0 ? 'right' : 'left';
+  else if (ay >= on && ay >= ax * 1.25) want = tilt.y > 0 ? 'down' : 'up';
+  if (!want || want === tilt.held) return;
+  const now = performance.now();
+  if (now - tilt.lastTurn < 120) return;
+  if (queueDir(DIRS[want])) { tilt.held = want; tilt.lastTurn = now; }
+}
+async function enableTilt(fromTap) {
+  if (!tiltSupported) return false;
+  if (tiltNeedsPermission && tilt.permission !== 'granted') {
+    if (!fromTap) return false;   // iPhone only allows asking after a tap
+    try { tilt.permission = await DeviceOrientationEvent.requestPermission(); } catch { tilt.permission = 'denied'; }
+    if (tilt.permission !== 'granted') return false;
+  }
+  if (!tilt.listening) { window.addEventListener('deviceorientation', onOrient); tilt.listening = true; }
+  return true;
+}
+function disableTilt() {
+  if (tilt.listening) { window.removeEventListener('deviceorientation', onOrient); tilt.listening = false; }
+  tilt.held = null;
+}
+// Small indicator in the corner of the board while tilt steering is on.
+function drawTiltIndicator() {
+  const r = CELL * 1.3, cx = W - r - CELL * .5, cy = r + CELL * .5;
+  const { on } = TILT_SENS[save.settings.sens];
+  const k = r / TILT_MAX;
+  const dx = clamp(tilt.x, -TILT_MAX, TILT_MAX) * k, dy = clamp(tilt.y, -TILT_MAX, TILT_MAX) * k;
+  const active = Math.max(Math.abs(tilt.x), Math.abs(tilt.y)) >= on;
+  ctx.save();
+  ctx.globalAlpha = .8;
+  ctx.fillStyle = 'rgba(15,23,42,.75)'; ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(148,163,184,.7)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.arc(cx, cy, on * k, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = active ? '#4ade80' : '#94a3b8';
+  ctx.beginPath(); ctx.arc(cx + dx, cy + dy, CELL * .22, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+// Live preview in the Controls panel.
+function updateTiltPreview() {
+  if (!openSheetEl || openSheetEl.id !== 'ctrlSheet' || !tiltOn()) return;
+  const R = 46, k = R / TILT_MAX, { on } = TILT_SENS[save.settings.sens];
+  const zone = $('tiltZone'), dot = $('tiltDot');
+  zone.style.width = zone.style.height = (on * k * 2) + 'px';
+  dot.style.transform = `translate(${clamp(tilt.x, -TILT_MAX, TILT_MAX) * k}px, ${clamp(tilt.y, -TILT_MAX, TILT_MAX) * k}px)`;
+  dot.classList.toggle('go', Math.max(Math.abs(tilt.x), Math.abs(tilt.y)) >= on);
+}
+
+// Keep the screen awake while steering by tilt (nobody is touching it, so it would dim).
+let wakeLock = null, wakeBusy = false;
+async function updateWakeLock() {
+  const want = tiltOn() && (state === 'playing' || state === 'countdown') && !document.hidden;
+  if (wakeBusy || !('wakeLock' in navigator) || want === !!wakeLock) return;
+  wakeBusy = true;
+  try {
+    if (want) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } else {
+      const w = wakeLock; wakeLock = null; await w.release();
+    }
+  } catch { wakeLock = null; }
+  wakeBusy = false;
+}
 
 // Fullscreen (Android Chrome, desktop). iPhone Safari doesn't support it, so the button stays hidden there.
 const root = document.documentElement;
@@ -1549,12 +1777,13 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
   window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(() => {}); });
 }
 
-applyPad();   // also runs layout()
+if (tiltOn()) enableTilt(false);   // Android can resume tilt straight away; iPhone asks on the first tap
+applyControl();   // also runs layout()
 new ResizeObserver(resize).observe(wrapEl);
 resize();
 setupGame();
 buildMenu();
-buildLegend();
+buildHelp();
 
 let lastT = performance.now();
 function frame(now) {
@@ -1563,6 +1792,7 @@ function frame(now) {
   update(dt);
   render(now);
   updateHud();
+  updateTiltPreview();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
