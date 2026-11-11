@@ -106,6 +106,10 @@
   .board-wrap[data-mode="maze"] { border-color: #475569; }
   .board-wrap[data-mode="secret"] { border-color: #a855f7; box-shadow: 0 20px 40px -10px rgb(0 0 0 / .6), 0 0 28px rgb(168 85 247 / .55); }
   canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  /* 3D view: the WebGL scene sits underneath; the flat canvas on top draws pop-ups and takes swipes */
+  #board { position: relative; }
+  #board3d { position: absolute; inset: 0; display: none; }
+  .board-wrap.is3d #board3d { display: block; }
 
   /* Overlay text is sized in em from --ov-fs, which JS sets from the board size,
      so menus and the game-over screen shrink to fit small phone boards. */
@@ -343,6 +347,7 @@
   </section>
 
   <div class="board-wrap" id="boardWrap">
+    <canvas id="board3d" aria-hidden="true"></canvas>
     <canvas id="board" role="img" aria-label="Snake game board. Use the arrow keys or swipe to steer."></canvas>
 
     <div class="overlay" id="menu" role="dialog" aria-modal="true" aria-label="Main menu">
@@ -491,11 +496,13 @@
     </div>
 
     <p class="desk-only ctrl-note">On a computer, the arrow keys or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> always work.</p>
+    <button class="ghost-btn wide" id="viewBtn" aria-pressed="true">🧊 3D view: On</button>
     <button class="ghost-btn wide" id="musicBtn" aria-pressed="true">🎵 Music: On</button>
     <button class="ghost-btn wide hidden" id="fsBtn">⛶ Fullscreen</button>
   </div>
 </section>
 
 <script src="game.js"></script>
+<script type="module" src="render3d.js"></script>
 </body>
 </html>
