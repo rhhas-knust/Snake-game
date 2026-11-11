@@ -132,7 +132,7 @@ const num = v => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Ma
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
 function loadSave() {
   let raw = {};
-  try { raw = obj(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch { raw = {}; }
+  try { raw = obj(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (_) { raw = {}; }
   const rs = obj(raw.settings), rt = obj(raw.stats), rd = obj(raw.daily);
   const bests = {};
   for (const [k, v] of Object.entries(obj(raw.bests))) {
@@ -163,11 +163,11 @@ function loadSave() {
   try {
     const old = parseInt(localStorage.getItem('snake_high_score'), 10);
     if (old > (s.bests['classic:medium'] || 0)) s.bests['classic:medium'] = old;
-  } catch {}
+  } catch (_) {}
   return s;
 }
 const save = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {} }
 const menuBestKey = () => `${save.settings.mode}:${save.settings.diff}`;
 
 // ---------- Daily Challenge ----------
@@ -285,7 +285,7 @@ function musicTick() {
 function startMusic() { if (!music.timer && musicWanted()) { music.timer = setInterval(musicTick, 60); musicTick(); } }
 function stopMusic() { if (music.timer) { clearInterval(music.timer); music.timer = null; music.next = 0; } }
 
-const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
 // Respects the system "reduce motion" setting: no screen shake, a much fainter hit flash.
 const motionMQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 const reduceMotion = () => !!(motionMQ && motionMQ.matches);
@@ -367,7 +367,7 @@ function setupGame(daily = false) {
   mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
   setTheme(save.settings.theme);
   snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
-  prevSnake = snake.map(s => ({ ...s }));
+  prevSnake = snake.map(s => (Object.assign({}, s)));
   dir = R; queue = [];
   obstacles = new Set(); obstacleList = [];
   if (mode.maze) buildMaze();
@@ -461,13 +461,13 @@ function spawnFruit() {
   const type = pickWeighted(FRUITS, r);
   const c = randomFree(r, 2);
   if (!c) return false;
-  items.push({ ...c, kind: 'fruit', type, born: gameTime });
+  items.push(Object.assign({}, c, { kind: 'fruit', type, born: gameTime }));
   return true;
 }
 function spawnGolden() {
   const c = randomFree(nextStream('golden'), 4);
   if (!c) return;
-  items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
+  items.push(Object.assign({}, c, { kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life }));
   floater(c.x + .5, c.y - .2, GOLDEN.short, GOLDEN.glow, .45);
 }
 function spawnHazard() {
@@ -478,7 +478,7 @@ function spawnHazard() {
   const life = between(r, 6000, 9000);
   const c = randomFree(r, 5);
   if (!c) return;
-  items.push({ ...c, kind: 'hazard', type, born: gameTime, expires: gameTime + life, life });
+  items.push(Object.assign({}, c, { kind: 'hazard', type, born: gameTime, expires: gameTime + life, life }));
 }
 function scheduleHazard() {
   nextHazardAt = gameTime + between(nextStream('hazardTime'), 5000, 10000) * Math.max(0.45, 1 - level * 0.05);
@@ -497,7 +497,7 @@ function spawnPower() {
   const c = randomFree(r, 4);
   if (!c) return;
   const life = 8000;
-  items.push({ ...c, kind: 'power', type, born: gameTime, expires: gameTime + life, life });
+  items.push(Object.assign({}, c, { kind: 'power', type, born: gameTime, expires: gameTime + life, life }));
 }
 
 // ---------- Core update ----------
@@ -583,7 +583,7 @@ function spawnPortal() {
   if (!c) return;
   portalSpawned = true;
   if (!isDaily) konamiBoost = false;
-  items.push({ ...c, kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life });
+  items.push(Object.assign({}, c, { kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life }));
   floater(c.x + .5, c.y - .2, '???', PORTAL.glow, .5);
   sfx.portal();
 }
@@ -591,7 +591,7 @@ function spawnCandy() {
   const r = nextStream('candy');
   const type = pickWeighted(CANDIES, r);
   const c = randomFree(r, 2);
-  if (c) items.push({ ...c, kind: 'candy', type, born: gameTime });
+  if (c) items.push(Object.assign({}, c, { kind: 'candy', type, born: gameTime }));
 }
 function enterSecret() {
   secret = { until: gameTime + SECRET_MS, rocks: obstacleList, points: 0 };
@@ -707,7 +707,7 @@ function levelUp() {
 function die(reason, win = false) {
   state = 'over';
   acc = 0; queue = [];
-  prevSnake = snake.map(s => ({ ...s }));
+  prevSnake = snake.map(s => (Object.assign({}, s)));
   deathReason = reason; isWin = win;
   if (secret) secretBest = Math.max(secretBest, secret.points);
   const h = snake[0];
@@ -1383,7 +1383,7 @@ function prepareShare() {
   const token = gameId;
   try {
     buildShareCard().toBlob(b => { if (token === gameId) shareBlob = b; }, 'image/png');
-  } catch { /* canvas export unavailable: sharing falls back to text only */ }
+  } catch (_) { /* canvas export unavailable: sharing falls back to text only */ }
 }
 
 function shareText() {
@@ -1430,7 +1430,7 @@ function buildShareCard() {
   g.fillStyle = '#070d1f'; rr(g, bx, by, bs, bs, 44); g.fill();
   g.restore();
   g.save(); rr(g, bx, by, bs, bs, 44); g.clip();
-  try { drawBoardSnapshot(g, bx, by, bs); } catch {}
+  try { drawBoardSnapshot(g, bx, by, bs); } catch (_) {}
   g.restore();
   g.lineWidth = 8; g.strokeStyle = isDaily ? '#f59e0b' : '#22c55e'; rr(g, bx, by, bs, bs, 44); g.stroke();
 
@@ -1500,7 +1500,7 @@ async function shareScore() {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
   let copied = false;
-  try { await navigator.clipboard.writeText(text); copied = true; } catch {}
+  try { await navigator.clipboard.writeText(text); copied = true; } catch (_) {}
   toast(file ? (copied ? '📸 Score card saved · caption copied' : '📸 Score card saved') : (copied ? '📋 Score copied' : '⚠️ Sharing not supported here'));
 }
 
@@ -1647,9 +1647,28 @@ function toggleSound() {
 }
 
 const KEYMAP = { arrowup: U, w: U, arrowdown: D, s: D, arrowleft: L, a: L, arrowright: R, d: R };
+// Smart TV browsers, TV remotes and older browsers name keys differently ("Up", "Spacebar", "Esc")
+// or only send a key code, so turn every key press into one standard name.
+const KEY_ALIASES = { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright',
+  spacebar: ' ', esc: 'escape', select: 'enter', ok: 'enter', accept: 'enter',
+  browserback: 'escape', goback: 'escape', back: 'escape', mediaplaypause: 'p', pause: 'p' };
+const KEY_CODES = { 37: 'arrowleft', 38: 'arrowup', 39: 'arrowright', 40: 'arrowdown', 13: 'enter', 32: ' ', 27: 'escape',
+  8: 'escape', 461: 'escape', 10009: 'escape', 19: 'p', 179: 'p', 415: 'p', 10252: 'p' };   // 461/10009: LG/Samsung remote Back
+function keyName(e) {
+  let k = typeof e.key === 'string' ? e.key : '';
+  if (k.length > 1 || k === ' ') k = KEY_ALIASES[k.toLowerCase()] || k.toLowerCase();
+  else k = k.toLowerCase();
+  if (!k || k === 'unidentified') {
+    const code = e.keyCode || e.which || 0;
+    k = KEY_CODES[code] || (code >= 65 && code <= 90 ? String.fromCharCode(code).toLowerCase() : '');
+  }
+  return k;
+}
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key.toLowerCase();
+  const k = keyName(e);
+  if (!k) return;
+  if (k === 'escape' && e.keyCode === 8 && e.target.closest && e.target.closest('input, textarea')) return;   // Backspace while typing
   if (openSheetEl) {   // a panel is open: Esc closes it, game keys are ignored
     if (k === 'escape') { e.preventDefault(); closeSheet(); }
     return;
@@ -1874,7 +1893,9 @@ if (!tiltSupported || !coarseMQ.matches) {
 
 // Converts device tilt into screen directions, whichever way the phone is turned.
 function screenTilt(gamma, beta) {
-  const angle = ((((screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0) % 360) + 360) % 360;
+  const so = screen.orientation && screen.orientation.angle;
+  const raw = so != null ? so : (window.orientation != null ? window.orientation : 0);
+  const angle = ((raw % 360) + 360) % 360;
   switch (angle) {
     case 90: return [beta, -gamma];
     case 180: return [-gamma, -beta];
@@ -1919,7 +1940,7 @@ async function enableTilt(fromTap) {
   if (!tiltSupported) return false;
   if (tiltNeedsPermission && tilt.permission !== 'granted') {
     if (!fromTap) return false;   // iPhone only allows asking after a tap
-    try { tilt.permission = await DeviceOrientationEvent.requestPermission(); } catch { tilt.permission = 'denied'; }
+    try { tilt.permission = await DeviceOrientationEvent.requestPermission(); } catch (_) { tilt.permission = 'denied'; }
     if (tilt.permission !== 'granted') return false;
   }
   if (!tilt.listening) { window.addEventListener('deviceorientation', onOrient); tilt.listening = true; }
@@ -1968,7 +1989,7 @@ async function updateWakeLock() {
     } else {
       const w = wakeLock; wakeLock = null; await w.release();
     }
-  } catch { wakeLock = null; }
+  } catch (_) { wakeLock = null; }
   wakeBusy = false;
 }
 
@@ -1982,7 +2003,7 @@ fsBtn.addEventListener('click', () => {
   try {
     const p = fsElement() ? fsExit.call(document) : fsRequest.call(root, { navigationUI: 'hide' });
     if (p && p.catch) p.catch(() => {});
-  } catch {}
+  } catch (_) {}
 });
 for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
   document.addEventListener(ev, () => {
@@ -2039,7 +2060,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 if (tiltOn()) enableTilt(false);   // Android can resume tilt straight away; iPhone asks on the first tap
 applyControl();   // also runs layout()
-new ResizeObserver(resize).observe(wrapEl);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(wrapEl);
+else window.addEventListener('resize', resize);   // older TV and tablet browsers
 resize();
 setupGame();
 buildMenu();
