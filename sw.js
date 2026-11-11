@@ -1,11 +1,13 @@
 // Snake Pro service worker: makes the installed app work offline.
 // Game code and pages are fetched network-first (so updates show up right away when online)
 // and fall back to the cache when offline. Icons and images are served cache-first.
-const CACHE = 'snakepro-v4';
+const CACHE = 'snakepro-v5';
 const CORE = [
   './',
   'index.html',
   'game.js',
+  'render3d.js',
+  'vendor/three.min.js',
   'manifest.webmanifest',
   'privacy.html',
   'icons/icon-192.png',
