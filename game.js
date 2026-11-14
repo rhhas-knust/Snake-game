@@ -58,6 +58,7 @@ const THEMES = {
     // due = sorry (sympathy), akwaaba = welcome.
     words: { count: ['Baako', 'Mmienu', 'Mmiɛnsa'], go: 'KƆ!', goSub: 'Go!', level: 'AYEKOO!', over: 'Due! Game over', hello: 'Akwaaba! 👋' },
     board: ['#06150f', '#0a2117'],
+    board3d: ['#2f7a4c', '#296b42'], sky: '#06110c', wall: '#b8860b',
   },
   classic: {
     name: 'Classic',
@@ -75,6 +76,7 @@ const THEMES = {
     ],
     words: { count: null, go: 'GO!', goSub: '', level: null, over: 'Game Over', hello: '' },
     board: ['#070d1f', '#0a1328'],
+    board3d: ['#34425f', '#2c3853'], sky: '#060b18', wall: '#64748b',
   },
 };
 // The active world's items (switched by setTheme).
@@ -130,7 +132,7 @@ const num = v => { const n = Number(v); return Number.isFinite(n) && n >= 0 ? Ma
 const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
 function loadSave() {
   let raw = {};
-  try { raw = obj(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch { raw = {}; }
+  try { raw = obj(JSON.parse(localStorage.getItem(SAVE_KEY))); } catch (_) { raw = {}; }
   const rs = obj(raw.settings), rt = obj(raw.stats), rd = obj(raw.daily);
   const bests = {};
   for (const [k, v] of Object.entries(obj(raw.bests))) {
@@ -147,6 +149,7 @@ function loadSave() {
       skin: SKINS[rs.skin] ? rs.skin : 'kente',
       theme: THEMES[rs.theme] ? rs.theme : 'ghana',
       music: rs.music !== false,
+      view: rs.view === '2d' ? '2d' : '3d',
       sound: rs.sound !== false,
       // How to steer on touch screens. Older saves had a plain on/off arrow-pad flag.
       control: ['swipe', 'pad', 'tilt'].includes(rs.control) ? rs.control : (rs.dpad === true ? 'pad' : 'swipe'),
@@ -160,11 +163,11 @@ function loadSave() {
   try {
     const old = parseInt(localStorage.getItem('snake_high_score'), 10);
     if (old > (s.bests['classic:medium'] || 0)) s.bests['classic:medium'] = old;
-  } catch {}
+  } catch (_) {}
   return s;
 }
 const save = loadSave();
-function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch {} }
+function persist() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (_) {} }
 const menuBestKey = () => `${save.settings.mode}:${save.settings.diff}`;
 
 // ---------- Daily Challenge ----------
@@ -282,7 +285,7 @@ function musicTick() {
 function startMusic() { if (!music.timer && musicWanted()) { music.timer = setInterval(musicTick, 60); musicTick(); } }
 function stopMusic() { if (music.timer) { clearInterval(music.timer); music.timer = null; music.next = 0; } }
 
-const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch {} };
+const vibrate = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
 // Respects the system "reduce motion" setting: no screen shake, a much fainter hit flash.
 const motionMQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 const reduceMotion = () => !!(motionMQ && motionMQ.matches);
@@ -364,7 +367,7 @@ function setupGame(daily = false) {
   mode = MODES[modeId]; diff = DIFFS[diffId]; skin = SKINS[save.settings.skin];
   setTheme(save.settings.theme);
   snake = [{ x: 9, y: 10 }, { x: 8, y: 10 }, { x: 7, y: 10 }, { x: 6, y: 10 }];
-  prevSnake = snake.map(s => ({ ...s }));
+  prevSnake = snake.map(s => (Object.assign({}, s)));
   dir = R; queue = [];
   obstacles = new Set(); obstacleList = [];
   if (mode.maze) buildMaze();
@@ -458,13 +461,13 @@ function spawnFruit() {
   const type = pickWeighted(FRUITS, r);
   const c = randomFree(r, 2);
   if (!c) return false;
-  items.push({ ...c, kind: 'fruit', type, born: gameTime });
+  items.push(Object.assign({}, c, { kind: 'fruit', type, born: gameTime }));
   return true;
 }
 function spawnGolden() {
   const c = randomFree(nextStream('golden'), 4);
   if (!c) return;
-  items.push({ ...c, kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life });
+  items.push(Object.assign({}, c, { kind: 'golden', type: GOLDEN, born: gameTime, expires: gameTime + GOLDEN.life, life: GOLDEN.life }));
   floater(c.x + .5, c.y - .2, GOLDEN.short, GOLDEN.glow, .45);
 }
 function spawnHazard() {
@@ -475,7 +478,7 @@ function spawnHazard() {
   const life = between(r, 6000, 9000);
   const c = randomFree(r, 5);
   if (!c) return;
-  items.push({ ...c, kind: 'hazard', type, born: gameTime, expires: gameTime + life, life });
+  items.push(Object.assign({}, c, { kind: 'hazard', type, born: gameTime, expires: gameTime + life, life }));
 }
 function scheduleHazard() {
   nextHazardAt = gameTime + between(nextStream('hazardTime'), 5000, 10000) * Math.max(0.45, 1 - level * 0.05);
@@ -494,7 +497,7 @@ function spawnPower() {
   const c = randomFree(r, 4);
   if (!c) return;
   const life = 8000;
-  items.push({ ...c, kind: 'power', type, born: gameTime, expires: gameTime + life, life });
+  items.push(Object.assign({}, c, { kind: 'power', type, born: gameTime, expires: gameTime + life, life }));
 }
 
 // ---------- Core update ----------
@@ -580,7 +583,7 @@ function spawnPortal() {
   if (!c) return;
   portalSpawned = true;
   if (!isDaily) konamiBoost = false;
-  items.push({ ...c, kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life });
+  items.push(Object.assign({}, c, { kind: 'portal', type: PORTAL, born: gameTime, expires: gameTime + PORTAL.life, life: PORTAL.life }));
   floater(c.x + .5, c.y - .2, '???', PORTAL.glow, .5);
   sfx.portal();
 }
@@ -588,7 +591,7 @@ function spawnCandy() {
   const r = nextStream('candy');
   const type = pickWeighted(CANDIES, r);
   const c = randomFree(r, 2);
-  if (c) items.push({ ...c, kind: 'candy', type, born: gameTime });
+  if (c) items.push(Object.assign({}, c, { kind: 'candy', type, born: gameTime }));
 }
 function enterSecret() {
   secret = { until: gameTime + SECRET_MS, rocks: obstacleList, points: 0 };
@@ -704,7 +707,7 @@ function levelUp() {
 function die(reason, win = false) {
   state = 'over';
   acc = 0; queue = [];
-  prevSnake = snake.map(s => ({ ...s }));
+  prevSnake = snake.map(s => (Object.assign({}, s)));
   deathReason = reason; isWin = win;
   if (secret) secretBest = Math.max(secretBest, secret.points);
   const h = snake[0];
@@ -849,6 +852,7 @@ function resize() {
   wrapEl.style.setProperty('--ov-fs', clamp(W / 28, 10.5, 16).toFixed(1) + 'px');
   spriteCache.clear();
   buildBg();
+  if (window.Snake3D) Snake3D.setSize(W, DPR);
 }
 
 // Size the board to the largest square that fits the screen below the HUD
@@ -920,6 +924,9 @@ function snakeColor(i, n, now) {
 
 function render(now) {
   if (!W) return;
+  const want3D = use3D();
+  if (want3D !== wrapEl.classList.contains('is3d')) wrapEl.classList.toggle('is3d', want3D);
+  if (want3D) return render3D(now);
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctx.fillStyle = '#070d1f'; ctx.fillRect(0, 0, W, W);
   if (shake > 0.2 && !reduceMotion()) ctx.translate((Math.random() - .5) * shake, (Math.random() - .5) * shake);
@@ -940,6 +947,96 @@ function render(now) {
   if (state === 'countdown') drawCountdown();
   if (tiltOn() && tilt.seen && (state === 'playing' || state === 'countdown')) drawTiltIndicator();
 }
+
+// ---------- 3D view (render3d.js) ----------
+// The 3D scene draws the board, snake, rocks and items. The flat canvas on top still draws the
+// things that should stay crisp and readable: score pop-ups, sparks, timers, banners, countdown.
+const use3D = () => save.settings.view === '3d' && !!window.Snake3D && Snake3D.ok;
+function itemState(it, now) {
+  let ix = it.x, iy = it.y;
+  if (it.movedAt != null && gameTime - it.movedAt < 120) {    // magnet slide
+    const k = (gameTime - it.movedAt) / 120;
+    ix = it.fromX + (it.x - it.fromX) * k; iy = it.fromY + (it.y - it.fromY) * k;
+  }
+  return {
+    ref: it, kind: it.kind, emoji: it.type.emoji, x: ix + .5, y: iy + .5,
+    scale: easeOutBack(clamp((gameTime - it.born) / 300, 0, 1)),
+    bob: Math.sin(now / 280 + it.x * 1.3 + it.y) * .08,
+    glow: it.kind === 'power' ? it.type.color : it.type.glow,
+    pulse: it.kind === 'hazard' ? 1 + .2 * Math.sin(now / 120) : 1,
+    blink: !!it.expires && it.expires - gameTime < 1500 && Math.floor(now / 110) % 2 === 1,
+    left: it.expires ? clamp((it.expires - gameTime) / it.life, 0, 1) : null,
+  };
+}
+let lastView = null;
+function build3DView(now) {
+  const pts = snakeCells(), n = pts.length;
+  const dead = state === 'over' && !isWin;
+  const ghost = isGhost() && state !== 'over';
+  return lastView = {
+    now, snake: pts, dir,
+    colors: pts.map((_, i) => snakeColor(i, n, now)),
+    headColor: skin.rainbow ? snakeColor(0, n, now) : skin.head,
+    dead, tongue: !dead && state !== 'menu' && now % 1700 < 260,
+    ghost: ghost ? .5 + .3 * Math.sin(now / 55) : 1,
+    shield: shield && state !== 'over',
+    items: items.map(it => itemState(it, now)),
+    rocks: obstacleList.map(r => ({ x: r.x, y: r.y, s: r.born ? easeOutBack(clamp((gameTime - r.born) / 350, 0, 1)) : 1 })),
+    board: secret ? ['#2a1a55', '#23164a'] : theme.board3d,
+    sky: theme.sky, secret: !!secret,
+    wallStyle: secret || mode.wrap ? 'glow' : 'solid',
+    wallColor: secret ? '#c084fc' : mode.wrap ? '#22d3ee' : theme.wall,
+    shake: reduceMotion() ? 0 : shake,
+  };
+}
+// A board point projected onto the flat overlay, plus how many pixels one square spans there.
+function onScreen(x, y, h = 0) {
+  const p = Snake3D.project(x, y, h), a = Snake3D.project(x - .5, y, h), b = Snake3D.project(x + .5, y, h);
+  p.k = Math.hypot(b.x - a.x, b.y - a.y);
+  return p;
+}
+function render3D(now) {
+  const view = build3DView(now);
+  Snake3D.render(view);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  ctx.clearRect(0, 0, W, W);
+  // Countdown rings on items that expire, drawn flat on the floor around them.
+  for (const it of view.items) {
+    if (it.left == null) continue;
+    const p = onScreen(it.x, it.y, .02);
+    ctx.strokeStyle = rgba(it.glow, .9); ctx.lineWidth = Math.max(1.5, p.k * .07); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.ellipse(p.x, p.y, p.k * .56, p.k * .56 * .87, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * it.left); ctx.stroke();
+  }
+  for (const pt of particles) {
+    const p = onScreen(pt.x, pt.y, .5);
+    ctx.globalAlpha = clamp(pt.life, 0, 1); ctx.fillStyle = pt.color;
+    ctx.beginPath(); ctx.arc(p.x, p.y, pt.size * p.k * (.5 + pt.life * .5), 0, Math.PI * 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  for (const f of floaters) {
+    const p = onScreen(f.x, f.y, 1.2);
+    ctx.globalAlpha = clamp(f.life * 1.6, 0, 1);
+    ctx.font = `800 ${Math.round(p.k * f.size * 1.6)}px system-ui, sans-serif`;
+    ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(2,6,23,.85)'; ctx.strokeText(f.text, p.x, p.y);
+    ctx.fillStyle = f.color; ctx.fillText(f.text, p.x, p.y);
+  }
+  ctx.globalAlpha = 1;
+  if (flash > 0) { ctx.fillStyle = `rgba(239,68,68,${flash * (reduceMotion() ? .08 : .28)})`; ctx.fillRect(0, 0, W, W); }
+  if (effects && effects.slow > gameTime && state !== 'menu') { ctx.fillStyle = 'rgba(167,139,250,.1)'; ctx.fillRect(0, 0, W, W); }
+  drawBanner();
+  if (state === 'countdown') drawCountdown();
+  if (tiltOn() && tilt.seen && (state === 'playing' || state === 'countdown')) drawTiltIndicator();
+}
+// The board as one picture (3D scene + overlay), for the share card.
+function drawBoardSnapshot(g, x, y, size) {
+  if (use3D() && lastView) {
+    Snake3D.render(lastView);    // draw now, so the WebGL buffer is fresh for copying
+    g.drawImage(Snake3D.canvas, x, y, size, size);
+  }
+  g.drawImage(canvas, x, y, size, size);
+}
+window.addEventListener('snake3d-ready', () => { resize(); updateViewBtn(); });
 
 const STARS = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: frand(.4, 1.6), p: frand(0, 6.28), s: frand(.6, 2) }));
 function drawStarfield(now) {
@@ -1010,19 +1107,20 @@ function drawItems(now) {
   }
 }
 
+// The snake's on-screen position between ticks, in board squares (centre of each square = .5).
+function snakeCells() {
+  const alpha = clamp(acc / currentStep(), 0, 1);
+  return snake.map((c, i) => {
+    const p = prevSnake[i] || c;
+    const jump = Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1;   // wrapped through an edge
+    return { x: (jump ? c.x : p.x + (c.x - p.x) * alpha) + .5, y: (jump ? c.y : p.y + (c.y - p.y) * alpha) + .5 };
+  });
+}
+
 function drawSnake(now) {
   if (!snake) return;
-  const step = currentStep();
-  const alpha = clamp(acc / step, 0, 1);
   const n = snake.length;
-  const pts = new Array(n);
-  for (let i = 0; i < n; i++) {
-    const c = snake[i], p = prevSnake[i] || c;
-    const jump = Math.abs(p.x - c.x) > 1 || Math.abs(p.y - c.y) > 1;   // wrapped through an edge
-    const x = jump ? c.x : p.x + (c.x - p.x) * alpha;
-    const y = jump ? c.y : p.y + (c.y - p.y) * alpha;
-    pts[i] = { x: (x + .5) * CELL, y: (y + .5) * CELL };
-  }
+  const pts = snakeCells().map(c => ({ x: c.x * CELL, y: c.y * CELL }));
   const width = i => CELL * (.8 - .3 * (n > 1 ? i / (n - 1) : 0));
   const linked = (a, b) => Math.abs(a.x - b.x) + Math.abs(a.y - b.y) < CELL * 1.5;
   const ghost = isGhost() && state !== 'over';
@@ -1166,12 +1264,15 @@ function drawCountdown() {
   ctx.font = `900 ${Math.round(W * .22)}px system-ui, sans-serif`;
   ctx.lineWidth = 8; ctx.strokeStyle = 'rgba(2,6,23,.8)'; ctx.strokeText(n, 0, 0);
   ctx.fillStyle = '#fff'; ctx.fillText(n, 0, 0);
-  if (theme.words.count) {
-    ctx.font = `800 ${Math.round(W * .055)}px system-ui, sans-serif`;
-    ctx.lineWidth = 5; ctx.strokeText(theme.words.count[n - 1], 0, W * .16);
-    ctx.fillStyle = '#fcd116'; ctx.fillText(theme.words.count[n - 1], 0, W * .16);
-  }
   ctx.restore();
+  if (theme.words.count) {   // the Twi number word, at a fixed spot under the big number
+    ctx.save();
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.font = `800 ${Math.round(W * .055)}px system-ui, sans-serif`;
+    ctx.lineWidth = 5; ctx.strokeStyle = 'rgba(2,6,23,.8)'; ctx.strokeText(theme.words.count[n - 1], W / 2, W * .64);
+    ctx.fillStyle = '#fcd116'; ctx.fillText(theme.words.count[n - 1], W / 2, W * .64);
+    ctx.restore();
+  }
   ctx.textAlign = 'center';
   ctx.font = `700 ${Math.round(W * .035)}px system-ui, sans-serif`;
   ctx.fillStyle = '#cbd5e1';
@@ -1282,7 +1383,7 @@ function prepareShare() {
   const token = gameId;
   try {
     buildShareCard().toBlob(b => { if (token === gameId) shareBlob = b; }, 'image/png');
-  } catch { /* canvas export unavailable: sharing falls back to text only */ }
+  } catch (_) { /* canvas export unavailable: sharing falls back to text only */ }
 }
 
 function shareText() {
@@ -1329,7 +1430,7 @@ function buildShareCard() {
   g.fillStyle = '#070d1f'; rr(g, bx, by, bs, bs, 44); g.fill();
   g.restore();
   g.save(); rr(g, bx, by, bs, bs, 44); g.clip();
-  try { g.drawImage(canvas, bx, by, bs, bs); } catch {}
+  try { drawBoardSnapshot(g, bx, by, bs); } catch (_) {}
   g.restore();
   g.lineWidth = 8; g.strokeStyle = isDaily ? '#f59e0b' : '#22c55e'; rr(g, bx, by, bs, bs, 44); g.stroke();
 
@@ -1399,7 +1500,7 @@ async function shareScore() {
     setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
   let copied = false;
-  try { await navigator.clipboard.writeText(text); copied = true; } catch {}
+  try { await navigator.clipboard.writeText(text); copied = true; } catch (_) {}
   toast(file ? (copied ? '📸 Score card saved · caption copied' : '📸 Score card saved') : (copied ? '📋 Score copied' : '⚠️ Sharing not supported here'));
 }
 
@@ -1546,9 +1647,28 @@ function toggleSound() {
 }
 
 const KEYMAP = { arrowup: U, w: U, arrowdown: D, s: D, arrowleft: L, a: L, arrowright: R, d: R };
+// Smart TV browsers, TV remotes and older browsers name keys differently ("Up", "Spacebar", "Esc")
+// or only send a key code, so turn every key press into one standard name.
+const KEY_ALIASES = { up: 'arrowup', down: 'arrowdown', left: 'arrowleft', right: 'arrowright',
+  spacebar: ' ', esc: 'escape', select: 'enter', ok: 'enter', accept: 'enter',
+  browserback: 'escape', goback: 'escape', back: 'escape', mediaplaypause: 'p', pause: 'p' };
+const KEY_CODES = { 37: 'arrowleft', 38: 'arrowup', 39: 'arrowright', 40: 'arrowdown', 13: 'enter', 32: ' ', 27: 'escape',
+  8: 'escape', 461: 'escape', 10009: 'escape', 19: 'p', 179: 'p', 415: 'p', 10252: 'p' };   // 461/10009: LG/Samsung remote Back
+function keyName(e) {
+  let k = typeof e.key === 'string' ? e.key : '';
+  if (k.length > 1 || k === ' ') k = KEY_ALIASES[k.toLowerCase()] || k.toLowerCase();
+  else k = k.toLowerCase();
+  if (!k || k === 'unidentified') {
+    const code = e.keyCode || e.which || 0;
+    k = KEY_CODES[code] || (code >= 65 && code <= 90 ? String.fromCharCode(code).toLowerCase() : '');
+  }
+  return k;
+}
 document.addEventListener('keydown', e => {
   if (e.ctrlKey || e.metaKey || e.altKey) return;
-  const k = e.key.toLowerCase();
+  const k = keyName(e);
+  if (!k) return;
+  if (k === 'escape' && e.keyCode === 8 && e.target.closest && e.target.closest('input, textarea')) return;   // Backspace while typing
   if (openSheetEl) {   // a panel is open: Esc closes it, game keys are ignored
     if (k === 'escape') { e.preventDefault(); closeSheet(); }
     return;
@@ -1732,6 +1852,22 @@ $('musicBtn').addEventListener('click', () => {
   persist(); sfx.click(); updateMusicBtn();
 });
 updateMusicBtn();
+function updateViewBtn() {
+  const b = $('viewBtn');
+  if (!window.Snake3D) {
+    b.disabled = true;
+    b.textContent = '🧊 3D view: not supported on this device';
+    return;
+  }
+  b.disabled = false;   // the 3D engine loads after the page, so this can start out disabled
+  b.textContent = save.settings.view === '3d' ? '🧊 3D view: On' : '🧊 3D view: Off (classic flat board)';
+  b.setAttribute('aria-pressed', String(save.settings.view === '3d'));
+}
+$('viewBtn').addEventListener('click', () => {
+  save.settings.view = save.settings.view === '3d' ? '2d' : '3d';
+  persist(); sfx.click(); updateViewBtn();
+});
+updateViewBtn();
 $('recenterBtn').addEventListener('click', () => {
   sfx.click();
   if (tilt.rawX != null) { tilt.cx = tilt.rawX; tilt.cy = tilt.rawY; tilt.x = tilt.y = 0; tilt.held = null; }
@@ -1757,7 +1893,9 @@ if (!tiltSupported || !coarseMQ.matches) {
 
 // Converts device tilt into screen directions, whichever way the phone is turned.
 function screenTilt(gamma, beta) {
-  const angle = ((((screen.orientation && screen.orientation.angle) ?? window.orientation ?? 0) % 360) + 360) % 360;
+  const so = screen.orientation && screen.orientation.angle;
+  const raw = so != null ? so : (window.orientation != null ? window.orientation : 0);
+  const angle = ((raw % 360) + 360) % 360;
   switch (angle) {
     case 90: return [beta, -gamma];
     case 180: return [-gamma, -beta];
@@ -1802,7 +1940,7 @@ async function enableTilt(fromTap) {
   if (!tiltSupported) return false;
   if (tiltNeedsPermission && tilt.permission !== 'granted') {
     if (!fromTap) return false;   // iPhone only allows asking after a tap
-    try { tilt.permission = await DeviceOrientationEvent.requestPermission(); } catch { tilt.permission = 'denied'; }
+    try { tilt.permission = await DeviceOrientationEvent.requestPermission(); } catch (_) { tilt.permission = 'denied'; }
     if (tilt.permission !== 'granted') return false;
   }
   if (!tilt.listening) { window.addEventListener('deviceorientation', onOrient); tilt.listening = true; }
@@ -1851,7 +1989,7 @@ async function updateWakeLock() {
     } else {
       const w = wakeLock; wakeLock = null; await w.release();
     }
-  } catch { wakeLock = null; }
+  } catch (_) { wakeLock = null; }
   wakeBusy = false;
 }
 
@@ -1865,7 +2003,7 @@ fsBtn.addEventListener('click', () => {
   try {
     const p = fsElement() ? fsExit.call(document) : fsRequest.call(root, { navigationUI: 'hide' });
     if (p && p.catch) p.catch(() => {});
-  } catch {}
+  } catch (_) {}
 });
 for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) {
   document.addEventListener(ev, () => {
@@ -1922,7 +2060,8 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 
 if (tiltOn()) enableTilt(false);   // Android can resume tilt straight away; iPhone asks on the first tap
 applyControl();   // also runs layout()
-new ResizeObserver(resize).observe(wrapEl);
+if (window.ResizeObserver) new ResizeObserver(resize).observe(wrapEl);
+else window.addEventListener('resize', resize);   // older TV and tablet browsers
 resize();
 setupGame();
 buildMenu();
